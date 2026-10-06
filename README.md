@@ -8,7 +8,7 @@ Trois rondes indépendantes, choisies depuis l'accueil (chacune a sa clôture, s
 
 | Ronde | Parcours | Points |
 |---|---|---|
-| Entrée n°1 | Hall → R+18 … RDC → Centrale de désenfumage (SSI) | 345 |
+| Entrée n°1 | Hall → RDC, R+1 … R+18 → Centrale de désenfumage (SSI) | 345 |
 | Entrée n°3 | idem | 345 |
 | Général | Extérieur → Toiture-terrasse | 14 |
 
@@ -48,6 +48,12 @@ Règles de la ronde :
 - clôture normale quand tous les points ont une réponse ; sinon « Clôturer quand même » exige un motif
   et la ronde est marquée **incomplète** (écran, PDF) ;
 - le suivi d'une anomalie (À traiter / En cours / Levée) garde la date de chaque changement.
+- **enregistrement automatique** : chaque réponse, la fiche anomalie en cours de saisie (texte et photo) et l'écran
+  affiché sont enregistrés en continu ; en rouvrant l'appli on revient exactement où on en était ;
+- **rappels (APK)** : notification du lundi au vendredi vers 8 h 30 tant que les 3 rondes de la semaine
+  (Entrée n°1, Entrée n°3, Général) ne sont pas clôturées. Heure et jours réglables dans `catalogue.js` (`RAPPEL`).
+  Une ronde compte pour la semaine où elle a été commencée (semaine du lundi au dimanche).
+  La version web (iPhone) n'a pas de notification : le bandeau de l'accueil indique les contrôles restants.
 
 ## Obtenir l'APK
 

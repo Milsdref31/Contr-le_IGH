@@ -74,5 +74,34 @@ const Native = (() => {
     if (!(window.onBack && window.onBack())) App.exitApp();
   });
 
-  return { saveAndShare, toast };
+  /* Rappels hebdomadaires (notifications locales, sans serveur).
+     list = [{ at: Date, body: texte }]. Remplace tous les rappels déjà programmés. */
+  const LN = Capacitor.registerPlugin('LocalNotifications');
+  const ID0 = 1000;   // plage d'identifiants réservée aux rappels : 1000 à 1099
+  async function planReminders(list) {
+    try {
+      let p = await LN.checkPermissions();
+      if (p.display !== 'granted') p = await LN.requestPermissions();
+      if (p.display !== 'granted') return false;
+      const pending = (await LN.getPending()).notifications.filter(x => x.id >= ID0 && x.id < ID0 + 100);
+      if (pending.length) await LN.cancel({ notifications: pending.map(x => ({ id: x.id })) });
+      if (list.length) {
+        await LN.schedule({
+          notifications: list.slice(0, 100).map((x, i) => ({
+            id: ID0 + i,
+            title: 'Ronde de sécurité LA TOUR',
+            body: x.body,
+            schedule: { at: x.at, allowWhileIdle: true },
+            isExactNotification: false,   // « vers 8 h 30 » : pas besoin d'alarme exacte
+          })),
+        });
+      }
+      return true;
+    } catch (e) {
+      console.warn('Rappels non programmés', e);
+      return false;
+    }
+  }
+
+  return { saveAndShare, toast, planReminders };
 })();

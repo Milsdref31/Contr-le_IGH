@@ -3,10 +3,9 @@
    C'est le seul fichier à modifier pour ajouter / retirer / renommer un point.
    ===================================================================== */
 
-/* Niveaux parcourus dans chaque entrée, dans l'ordre de la ronde (du haut vers le bas). */
-const NIVEAUX = [];
-for (let i = 18; i >= 1; i--) NIVEAUX.push('R+' + i);
-NIVEAUX.push('RDC');
+/* Niveaux parcourus dans chaque entrée, dans l'ordre de la ronde : après le hall, RDC puis montée jusqu'au R+18. */
+const NIVEAUX = ['RDC'];
+for (let i = 1; i <= 18; i++) NIVEAUX.push('R+' + i);
 
 /* Entrées concernées. */
 const ENTREES = [1, 3];
@@ -51,10 +50,13 @@ const POINTS = [
   ['13.2', 'Centrale de désenfumage', 'Absence de défaut / voyant orange ou rouge', 'o'],
 ];
 
+/* Rappel : du lundi au vendredi à cette heure, tant que les 3 rondes de la semaine ne sont pas clôturées (APK). */
+const RAPPEL = { heure: 8, minute: 30, jours: [1, 2, 3, 4, 5] };   // 1 = lundi … 5 = vendredi
+
 /* Les trois rondes, choisies séparément depuis l'accueil. */
 const RONDES = {
-  e1: { nom: 'Entrée n°1', parcours: 'Hall, R+18 à RDC, centrale SSI' },
-  e3: { nom: 'Entrée n°3', parcours: 'Hall, R+18 à RDC, centrale SSI' },
+  e1: { nom: 'Entrée n°1', parcours: 'Hall, RDC à R+18, centrale SSI' },
+  e3: { nom: 'Entrée n°3', parcours: 'Hall, RDC à R+18, centrale SSI' },
   g:  { nom: 'Général',    parcours: 'Extérieur, toiture-terrasse' },
 };
 

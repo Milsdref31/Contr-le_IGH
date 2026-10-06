@@ -10,10 +10,19 @@ let DB;
 try { DB = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* stockage illisible : on repart à vide */ }
 DB = DB || { rondes: [], cur: null, agent: '' };
 
+/* Enregistrement automatique : appelé à chaque réponse, saisie, changement d'écran
+   et quand l'appli passe en arrière-plan. Rien n'est jamais à « enregistrer » à la main. */
+let lastSave = null;
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(DB)); }
+  try { localStorage.setItem(KEY, JSON.stringify(DB)); lastSave = new Date(); showSaved(); }
   catch (e) { alert('Mémoire du téléphone pleine. Exportez puis supprimez d’anciennes rondes.'); }
 }
+function showSaved() {
+  const el = document.getElementById('sv');
+  if (el && lastSave) el.textContent = 'Enregistré ' + lastSave.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+/* Demande au navigateur de ne pas effacer les données (iOS / Android). */
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 const cur = () => DB.rondes.find(r => r.id === DB.cur);
 const byId = id => DB.rondes.find(r => r.id == id);
 const enCours = t => DB.rondes.find(r => r.type === t && r.statut === 'en cours');
@@ -52,6 +61,33 @@ function anomalies() {
 }
 const ouverte = a => a.x.suivi !== 'Levée';
 
+/* ---------- Contrôles de la semaine (lundi 00:00 à dimanche 23:59) ---------- */
+function lundi(d) {
+  const x = new Date(d); x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+/* Ronde clôturée cette semaine pour ce type (la plus récente), sinon undefined. */
+const faiteSemaine = (t, ref) => closes().filter(r => r.type === t && new Date(r.debut) >= lundi(ref || new Date())).pop();
+const resteSemaine = ref => Object.keys(RONDES).filter(t => !faiteSemaine(t, ref));
+
+/* Calcule les rappels des 4 prochaines semaines : jours ouvrés à 8 h 30,
+   sauf pour la semaine en cours si les 3 rondes sont déjà clôturées. */
+function planRappels() {
+  const list = [], maintenant = new Date(), reste = resteSemaine();
+  const d = new Date(maintenant); d.setHours(RAPPEL.heure, RAPPEL.minute, 0, 0);
+  for (let i = 0; i < 28; i++, d.setDate(d.getDate() + 1)) {
+    if (!RAPPEL.jours.includes(d.getDay()) || d <= maintenant) continue;
+    const memeSemaine = lundi(d).getTime() === lundi(maintenant).getTime();
+    const aFaire = memeSemaine ? reste : Object.keys(RONDES);
+    if (!aFaire.length) continue;
+    list.push({ at: new Date(d), body: (aFaire.length === 3 ? 'Les 3 contrôles' : plural(aFaire.length, 'contrôle')) +
+      ' de la semaine à faire : ' + aFaire.map(t => RONDES[t].nom).join(', ') + '.' });
+  }
+  return list;
+}
+function majRappels() { if (NATIVE) Native.planReminders(planRappels()); }
+
 /* ---------- Fichiers exportés : AAAA-MM-JJ_Ronde_LA-TOUR_Entree-1.pdf ---------- */
 const SLUG = { e1: 'Entree-1', e3: 'Entree-3', g: 'General' };
 const day = r => { const t = new Date(r.debut); return t.getFullYear() + '-' + p2(t.getMonth() + 1) + '-' + p2(t.getDate()); };
@@ -80,7 +116,7 @@ async function exportPDF(r) {
   doc.save(name);
 }
 
-function exportCSV(r) {
+async function exportCSV(r) {
   const L = [['Date', 'Heure', 'Contrôleur', 'Bâtiment', 'Ronde', 'Entrée', 'Niveau / zone', 'Point', 'Famille', 'Libellé',
     'Résultat', 'Lieu anomalie', 'Observation', 'Photo', 'Suivi', 'Mode']];
   stationsDe(r).forEach(s => s.pts.forEach(p => {
@@ -93,6 +129,11 @@ function exportCSV(r) {
   const txt = '﻿' + L.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
   const b = new Blob([txt], { type: 'text/csv' });
   if (NATIVE) return Native.saveAndShare(b, fname(r) + '.csv', day(r));
+  const f = new File([b], fname(r) + '.csv', { type: 'text/csv' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) {
+    try { await navigator.share({ files: [f], title: f.name }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(b);
   a.download = fname(r) + '.csv';
@@ -125,13 +166,19 @@ function home() {
         <div class="row"><span class="mut small">${c.done} sur ${c.t} points${c.n ? ', ' + plural(c.n, 'non conforme', 'non conformes') : ''}</span><span class="act">Reprendre ›</span></div>
       </button>`;
     }
+    const fait = faiteSemaine(t);
     return `<button class="ronde" data-a="new" data-t="${t}">
-      <div class="row"><span class="n">${RONDES[t].nom}</span><span class="mut small">${totalPoints(t)} points</span></div>
+      <div class="row"><span class="n">${RONDES[t].nom}</span>${fait ? `<span class="pill ok">Faite le ${fd(fait.debut)}</span>` : '<span class="pill ko">À faire cette semaine</span>'}</div>
       <div class="d">${RONDES[t].parcours}</div>
-      <div class="row"><span class="mut small">${lastTxt}</span><span class="act">Démarrer ›</span></div>
+      <div class="row"><span class="mut small">${lastTxt}<br>${totalPoints(t)} points</span><span class="act">Démarrer ›</span></div>
     </button>`;
   }).join('');
+  const reste = resteSemaine();
+  const semaine = reste.length
+    ? `<div class="box warn"><b>${reste.length === 3 ? 'Les 3 contrôles' : plural(reste.length, 'contrôle')} de la semaine à faire</b><br>${reste.map(t => RONDES[t].nom).join(', ')}</div>`
+    : `<div class="box" style="border-color:var(--safe);background:var(--safe-bg)"><b>Contrôles de la semaine terminés.</b><br>Prochain rappel lundi à ${RAPPEL.heure} h ${p2(RAPPEL.minute)}.</div>`;
   return `<div class="hero"><h1>LA TOUR</h1><p>Ronde de sécurité hebdomadaire</p></div>
+  ${semaine}
   <div class="agent"><label for="ag">Contrôleur</label><input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom" autocomplete="name"></div>
   <h2>Choisissez la ronde à faire</h2>
   ${cartes}
@@ -153,7 +200,7 @@ function etat(r, s) {
 function list() {
   const r = cur(), c = cnt(r), L = stationsDe(r);
   const next = L.find(s => cnt(r, [s]).rest > 0);
-  return `${topBar('home', RONDES[r.type].nom, `${c.done} sur ${c.t} points · ${plural(c.n, 'non conforme', 'non conformes')}`)}
+  return `${topBar('home', RONDES[r.type].nom, `${c.done} sur ${c.t} points · ${plural(c.n, 'non conforme', 'non conformes')}`, '<div id="sv" class="s"></div>')}
   <div style="margin:-12px -14px 12px">${progress(c).replace('class="prog"', 'class="prog" style="margin:0;border-radius:0"')}</div>
   ${next ? `<button class="btn go" data-a="open" data-id="${next.id}">Continuer : ${esc(next.titre)}</button>` : '<div class="box">Tous les points ont reçu une réponse.</div>'}
   <h2>Parcours</h2>
@@ -181,7 +228,7 @@ function stationView() {
   const r = cur(), L = stationsDe(r), i = L.findIndex(s => s.id === V.id), s = L[i], k = cnt(r, [s]);
   let fam = '';
   const suiv = L.slice(i + 1).find(x => cnt(r, [x]).rest > 0) || L[i + 1];
-  return `${topBar('list', esc(s.titre), RONDES[r.type].nom + ', ' + esc(s.sous), `<span id="cn" class="s">${k.done}/${k.t}</span>`)}
+  return `${topBar('list', esc(s.titre), RONDES[r.type].nom + ', ' + esc(s.sous), `<div id="cn" class="t" style="text-align:right">${k.done}/${k.t}</div><div id="sv" class="s"></div>`)}
   ${k.rest ? `<button class="btn ghost" data-a="all" data-id="${s.id}">✓ Tout mettre conforme (${k.rest})</button>` : ''}
   ${s.pts.map(p => (p.fam !== fam ? (fam = p.fam, `<div class="fam">${esc(fam)}</div>`) : '') + row(r, p)).join('')}
   <div class="dock">${suiv
@@ -279,7 +326,7 @@ function sheet() {
     <label for="lieu">Lieu</label><input id="lieu" value="${esc(x.lieu)}">
     <label for="ent">Entrée</label><select id="ent">${['', 'n°1', 'n°3'].map(o => `<option ${o === x.ent ? 'selected' : ''}>${o}</option>`).join('')}</select>
     <label for="com">Observation (obligatoire)</label><textarea id="com" rows="3">${esc(x.com)}</textarea>
-    <label class="btn ghost">📷 Prendre ou joindre une photo<input id="ph" type="file" accept="image/*" capture="environment" hidden></label>
+    <label class="btn ghost" data-a="snap">📷 Prendre ou joindre une photo<input id="ph" type="file" accept="image/*" capture="environment" hidden></label>
     <div id="pv">${x.ph ? `<img src="${x.ph}" alt="">` : ''}</div>
     <button class="btn" data-a="save">Enregistrer l’anomalie</button><button class="btn ghost" data-a="cancel">Annuler</button></div></div>`;
 }
@@ -289,7 +336,32 @@ const SCREENS = { home, list, st: stationView, recap, rep: rapport, hist, anom }
 function render(keepScroll) {
   $('#app').innerHTML = SCREENS[V.s]() + (M ? sheet() : '');
   if (!keepScroll) scrollTo(0, 0);
+  rememberScreen();
+  showSaved();
 }
+/* Écran courant + fiche anomalie en cours (brouillon) : retrouvés à la réouverture. */
+function rememberScreen() {
+  DB.ui = { V, y: Math.round(scrollY), draft: M && M.kind === 'nc' ? { k: M.k, x: M.x } : null };
+  save();
+}
+/* À appeler AVANT le premier affichage (sinon l'accueil écrase l'écran mémorisé). */
+function restoreScreen() {
+  const ui = DB.ui;
+  if (!ui || !ui.V || !SCREENS[ui.V.s]) return;
+  const r = cur(), needsRonde = ['list', 'st', 'recap'].includes(ui.V.s);
+  if (needsRonde && !(r && r.statut === 'en cours')) return;
+  if (ui.V.s === 'rep' && !byId(ui.V.id)) return;
+  if (ui.V.s === 'st' && !STATIONS.find(x => x.id === ui.V.id)) return;
+  V = ui.V;
+  if (ui.draft && r && PK[ui.draft.k]) M = { kind: 'nc', k: ui.draft.k, x: ui.draft.x };
+}
+/* Mise en arrière-plan / fermeture : on enregistre la position. */
+function flush() {
+  if (M && M.kind === 'nc' && $('#com')) { M.x.lieu = $('#lieu').value; M.x.ent = $('#ent').value; M.x.com = $('#com').value; }
+  rememberScreen();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+addEventListener('pagehide', flush);
 /* Met à jour un seul point sans redessiner l'écran (garde la position). */
 function updateRow(k) {
   const el = document.querySelector(`[data-row="${k}"]`), r = cur(), s = PK[k].s, c = cnt(r, [s]);
@@ -315,6 +387,7 @@ function cloturer(r, motif) {
   if (motif) { r.incomplete = true; r.motif = motif; }
   DB.cur = null;
   save();
+  majRappels();
   V = { s: 'rep', id: r.id };
   M = null;
   render();
@@ -355,6 +428,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'cancel': M = null; render(true); break;
+    case 'snap': flush(); return;   // juste avant l'appareil photo
     case 'save': {
       const com = $('#com').value.trim();
       if (!com) { $('#com').focus(); $('#com').classList.add('err'); return; }
@@ -390,14 +464,18 @@ document.addEventListener('click', e => {
 
 /* Nom du contrôleur mémorisé dès la saisie */
 document.addEventListener('input', e => {
-  if (e.target.id === 'ag') { DB.agent = e.target.value.trim(); save(); e.target.parentNode.classList.remove('err'); }
+  const id = e.target.id;
+  if (id === 'ag') { DB.agent = e.target.value.trim(); save(); e.target.parentNode.classList.remove('err'); }
+  if (M && M.kind === 'nc' && (id === 'lieu' || id === 'com' || id === 'ent')) { M.x[id] = e.target.value; rememberScreen(); }
 });
 
 /* Photo : réduite à 900 px (JPEG) pour ne pas saturer la mémoire du téléphone */
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'ent' && M && M.kind === 'nc') { M.x.ent = t.value; rememberScreen(); }
   if (t.id !== 'ph' || !t.files[0]) return;
   M.x.lieu = $('#lieu').value; M.x.ent = $('#ent').value; M.x.com = $('#com').value;
+  rememberScreen();
   const im = new Image(), fr = new FileReader();
   fr.onload = () => {
     im.onload = () => {
@@ -406,6 +484,7 @@ document.addEventListener('change', e => {
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
       M.x.ph = c.toDataURL('image/jpeg', 0.6);
       $('#pv').innerHTML = '<img src="' + M.x.ph + '" alt="">';
+      rememberScreen();   // la photo est gardée même si l'appli est fermée avant « Enregistrer »
     };
     im.src = fr.result;
   };
@@ -422,4 +501,8 @@ window.onBack = () => {
 };
 
 if (!NATIVE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-render();
+const startY = (DB.ui && DB.ui.y) || 0;
+restoreScreen();
+render(true);
+majRappels();
+scrollTo(0, startY);
