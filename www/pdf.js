@@ -11,7 +11,7 @@ const cnt=H.cnt;
 /* En-tête */
 d.setFillColor(...PRI);d.rect(0,0,W,30,'F');
 d.setTextColor(255,255,255);d.setFont('helvetica','bold');d.setFontSize(18);d.text('RONDE DE SÉCURITÉ - LA TOUR',Mx,13);
-d.setFont('helvetica','normal');d.setFontSize(11);d.text('Ronde du '+H.fd(r.debut),Mx,21.5);
+d.setFont('helvetica','normal');d.setFontSize(11);d.text((H.label?H.label+'  -  ':'')+'Ronde du '+H.fd(r.debut),Mx,21.5);
 /* Logo facultatif (www/logo.png), en haut à droite sur fond blanc */
 if(H.logo){try{const ip=d.getImageProperties(H.logo),sc=Math.min(40/ip.width,20/ip.height),w=ip.width*sc,h=ip.height*sc,x=W-Mx-w,y0=(30-h)/2;
  d.setFillColor(255,255,255);d.roundedRect(x-2,y0-2,w+4,h+4,1.5,1.5,'F');d.addImage(H.logo,ip.fileType||'PNG',x,y0,w,h)}catch(e){}}
@@ -62,6 +62,6 @@ Object.keys(PARTS).forEach(k=>{
   y+=1.5})});
 
 /* Pied de page */
-const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);font(8,false,MUT);d.text('Ronde LA TOUR - '+H.fd(r.debut)+' - page '+i+'/'+n,Mx,291)}
+const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);font(8,false,MUT);d.text('Ronde LA TOUR'+(H.label?' - '+H.label:'')+' - '+H.fd(r.debut)+' - page '+i+'/'+n,Mx,291)}
 return d}
 if(typeof module!=='undefined')module.exports={makePDF};

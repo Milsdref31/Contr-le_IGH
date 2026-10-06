@@ -95,30 +95,37 @@ const P=[
 /* ===== ORDRE DE LA RONDE : modifiez ici ===== */
 const pick=f=>P.filter(p=>p[1]===f),lv=P.filter(p=>p[3]==='l');
 const mk=(id,titre,sous,ent,pts,part)=>({id,titre,sous,ent,part,pts:pts.map(p=>({k:id+'|'+p[0],id:p[0],fam:p[1],lib:p[2]}))});
-const ST=[mk('ext','Extérieur','Voie, portail, locaux','',pick('Extérieur'),'g'),
-mk('hall','Hall','Rez-de-chaussée','',pick('Hall'),'g'),
-mk('toit','Toiture-terrasse','','',pick('Toiture-terrasse'),'g')];
-ENTREES.forEach(e=>NIVEAUX.forEach(n=>ST.push(mk('e'+e+'-'+n,n+' | Entrée n°'+e,'Escalier, paliers, placards','n°'+e,lv,'e'+e))));
-ST.push(mk('centrale','Centrale de désenfumage','SSI','',pick('Centrale de désenfumage'),'g'));
+/* Trois rondes indépendantes. Ordre de chaque entrée = déplacement réel :
+   Hall → R+18 … RDC → Centrale de désenfumage (SSI). */
+const PARTS={e1:'Entrée n°1',e3:'Entrée n°3',g:'Général'};
+const ST=[];
+ENTREES.forEach(e=>{const t='e'+e,ent='n°'+e;
+ ST.push(mk(t+'-hall','Hall','Rez-de-chaussée · demi-niveau',ent,pick('Hall'),t));
+ NIVEAUX.forEach(n=>ST.push(mk(t+'-'+n,n,'Escalier, paliers, placards',ent,lv,t)));
+ ST.push(mk(t+'-centrale','Centrale de désenfumage','SSI',ent,pick('Centrale de désenfumage'),t))});
+ST.push(mk('ext','Extérieur','Voie, portail, locaux','',pick('Extérieur'),'g'));
+ST.push(mk('toit','Toiture-terrasse','','',pick('Toiture-terrasse'),'g'));
 const PK={};ST.forEach(s=>s.pts.forEach(p=>PK[p.k]={p,s}));
-const TOTAL=ST.reduce((a,s)=>a+s.pts.length,0);
-const PARTS={g:'Général',e1:'Entrée n°1',e3:'Entrée n°3'};let TAB='g';
+const STR=r=>ST.filter(s=>s.part===r.type);   /* stations de la ronde r */
+const TOT=t=>ST.filter(s=>s.part===t).reduce((a,s)=>a+s.pts.length,0);
 
 /* ===== DONNÉES (stockées sur le téléphone) ===== */
-const KEY='ronde_latour_v1';
+const KEY='ronde_latour_v3';  /* v3 : rondes séparées par entrée (les données v2 restent sous l'ancienne clé) */
 let DB;try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 DB=DB||{rondes:[],cur:null,agent:''};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){alert('Mémoire du téléphone pleine. Exportez puis supprimez d’anciennes rondes.')}};
 const cur=()=>DB.rondes.find(r=>r.id===DB.cur);
 const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fd=i=>new Date(i).toLocaleDateString('fr-FR'),ft=i=>new Date(i).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-const cnt=(r,ss)=>{let c=0,n=0,t=0;(ss||ST).forEach(s=>s.pts.forEach(p=>{t++;const x=r.r[p.k];if(x)x.v==='C'?c++:n++}));return{t,c,n,rest:t-c-n,done:c+n}};
+const cnt=(r,ss)=>{let c=0,n=0,t=0;(ss||STR(r)).forEach(s=>s.pts.forEach(p=>{t++;const x=r.r[p.k];if(x)x.v==='C'?c++:n++}));return{t,c,n,rest:t-c-n,done:c+n}};
 const p2=n=>String(n).padStart(2,'0');
 const dur=r=>{const m=Math.round((new Date(r.fin)-new Date(r.debut))/60000);return m>=60?Math.floor(m/60)+' h '+p2(m%60):m+' min'};
-const fname=r=>{const t=new Date(r.debut);return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())+'_Ronde_LA-TOUR'};
+const SLUG={e1:'Entree-1',e3:'Entree-3',g:'General'};
+const day=r=>{const t=new Date(r.debut);return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())};
+const fname=r=>day(r)+'_Ronde_LA-TOUR_'+SLUG[r.type];
 async function exportPDF(r){if(!window.jspdf){alert('Module PDF non chargé : ouvrez l’application une fois avec du réseau.');return}
-const d=makePDF(r,ST,PARTS,{fd,ft,dur,cnt,logo:LOGO}),name=fname(r)+'.pdf';
-if(NATIVE)return Native.saveAndShare(d.output('blob'),name,fname(r).slice(0,10));
+const d=makePDF(r,STR(r),{[r.type]:PARTS[r.type]},{fd,ft,dur,cnt,logo:LOGO,label:PARTS[r.type]}),name=fname(r)+'.pdf';
+if(NATIVE)return Native.saveAndShare(d.output('blob'),name,day(r));
 const f=new File([d.output('blob')],name,{type:'application/pdf'});
 if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:name});return}catch(e){if(e.name==='AbortError')return}}
 d.save(name)}
@@ -127,47 +134,50 @@ let LOGO=null;fetch('logo.png').then(x=>x.ok?x.blob():null).then(b=>{if(!b)retur
 let V={s:'home'},M=null;
 
 /* ===== ÉCRANS ===== */
-function home(){const r=cur(),open=DB.rondes.filter(x=>x.statut==='clôturée').flatMap(x=>Object.values(x.r).filter(y=>y.v==='NC'&&y.suivi!=='Levée')).length;
+const enCours=t=>DB.rondes.find(x=>x.type===t&&x.statut==='en cours');
+function home(){const open=DB.rondes.filter(x=>x.statut==='clôturée').flatMap(x=>Object.values(x.r).filter(y=>y.v==='NC'&&y.suivi!=='Levée')).length;
 return `<h1>Ronde de sécurité<br>LA TOUR</h1>
-${r?`<div class="card"><b>Ronde en cours</b><br>${fd(r.debut)} · ${esc(r.agent)}<br>${cnt(r).done}/${TOTAL} points contrôlés</div><button class="btn" data-a="go" data-s="list">Reprendre la ronde</button>`:
-`<div class="card"><label>Contrôleur<input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom"></label></div><button class="btn" data-a="new">Démarrer une ronde</button>`}
+<div class="card"><label>Contrôleur<input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom"></label></div>
+<h2>Quel contrôle faites-vous ?</h2>
+${Object.keys(PARTS).map(t=>{const r=enCours(t);return r
+ ?`<button class="st p" data-a="resume" data-r="${r.id}"><div><b>${PARTS[t]}</b><br><small>En cours depuis le ${fd(r.debut)} ${ft(r.debut)} · ${esc(r.agent)}</small></div><span>${cnt(r).done}/${TOT(t)} ›</span></button>`
+ :`<button class="st" data-a="new" data-t="${t}"><div><b>${PARTS[t]}</b><br><small>${t==='g'?'Extérieur, toiture-terrasse':'Hall, R+18 → RDC, centrale SSI'}</small></div><span>${TOT(t)} points ›</span></button>`}).join('')}
 <button class="btn sec" data-a="go" data-s="hist">Historique des rondes</button>
 <button class="btn sec" data-a="go" data-s="anom">Anomalies à traiter (${open})</button>`}
-function list(){const r=cur(),c=cnt(r),tabs=Object.keys(PARTS).map(k=>{const q=cnt(r,ST.filter(s=>s.part===k));return `<button class="tab ${TAB===k?'on':''}" data-a="tab" data-p="${k}">${PARTS[k]}<small>${q.done}/${q.t}${q.rest===0?' ✓':''}</small></button>`}).join('');
-return `<div class="bar"><div><b>${c.done}/${c.t}</b> <small>contrôlés · ${c.n} non conformes</small></div><button class="btn small sec" data-a="go" data-s="recap">Terminer</button></div>
-<div class="tabs">${tabs}</div>
-${ST.filter(s=>s.part===TAB).map(s=>{const k=cnt(r,[s]),bad=s.pts.some(p=>r.r[p.k]&&r.r[p.k].v==='NC');
+function list(){const r=cur(),c=cnt(r);
+return `<div class="bar"><div><b>${PARTS[r.type]}</b><br><small>${c.done}/${c.t} contrôlés · ${c.n} non conformes</small></div><button class="btn small sec" data-a="go" data-s="recap">Terminer</button></div>
+${STR(r).map(s=>{const k=cnt(r,[s]),bad=s.pts.some(p=>r.r[p.k]&&r.r[p.k].v==='NC');
 return `<button class="st ${k.rest===0?'d':k.done?'p':''} ${bad?'k':''}" data-a="open" data-id="${s.id}"><div><b>${esc(s.titre)}</b><br><small>${esc(s.sous)}</small></div><span>${k.done}/${k.t}${k.rest===0?' ✓':''}</span></button>`}).join('')}
 <button class="btn sec noprint" data-a="go" data-s="home">Accueil</button>`}
 function row(r,p){const x=r.r[p.k];return `<div class="pt ${x?x.v:''}" data-row="${p.k}"><div class="lib"><b>${p.id}</b>${esc(p.lib)}</div>
 <div class="bt"><button class="c" data-a="c" data-k="${p.k}">✓ CONFORME</button><button class="n" data-a="nc" data-k="${p.k}">✕ NON CONFORME</button></div>
 ${x&&x.v==='NC'?`<div class="note">${esc(x.lieu)} · ${esc(x.com)}${x.ph?' · 📷':''}</div>`:''}${x?`<div class="tm">${ft(x.t)}${x.bloc?' · validé en bloc':''}</div>`:''}</div>`}
-function station(){const r=cur(),i=ST.findIndex(s=>s.id===V.id),s=ST[i],rest=cnt(r,[s]).rest;let f='';
+function station(){const r=cur(),L=STR(r),i=L.findIndex(s=>s.id===V.id),s=L[i],rest=cnt(r,[s]).rest;let f='';
 return `<div class="bar"><button class="btn small sec" data-a="go" data-s="list">‹ Liste</button><b>${esc(s.titre)}</b><small id="cn"></small></div>
+<div class="tm" style="margin:-4px 0 6px">${PARTS[r.type]}${s.sous?' · '+esc(s.sous):''}</div>
 ${rest?`<button class="btn sec" data-a="all" data-id="${s.id}">✓ Tout mettre conforme (${rest})</button>`:''}
 ${s.pts.map(p=>(p.fam!==f?(f=p.fam,`<div class="fam">${esc(f)}</div>`):'')+row(r,p)).join('')}
-${ST[i+1]?`<button class="btn" data-a="open" data-id="${ST[i+1].id}">Suivant : ${esc(ST[i+1].titre)} ›</button>`:`<button class="btn" data-a="go" data-s="recap">Terminer la ronde</button>`}`}
-function recap(){const r=cur(),c=cnt(r),miss=ST.filter(s=>cnt(r,[s]).rest>0);
+${L[i+1]?`<button class="btn" data-a="open" data-id="${L[i+1].id}">Suivant : ${esc(L[i+1].titre)} ›</button>`:`<button class="btn" data-a="go" data-s="recap">Terminer la ronde</button>`}`}
+function recap(){const r=cur(),c=cnt(r),miss=STR(r).filter(s=>cnt(r,[s]).rest>0);
 return `<div class="bar"><button class="btn small sec" data-a="go" data-s="list">‹ Retour</button><b>Récapitulatif</b><span></span></div>
-<h1>RONDE DU ${fd(r.debut)}</h1>
+<h1>RONDE DU ${fd(r.debut)}</h1><h2 style="margin-top:0">${PARTS[r.type]}</h2>
 <div class="kpi"><div><b>${c.done}</b><small>réalisés</small></div><div><b style="color:var(--ok)">${c.c}</b><small>conformes</small></div><div><b style="color:var(--ko)">${c.n}</b><small>non conf.</small></div><div><b>${c.rest}</b><small>manquants</small></div></div>
-<div class="card">${Object.keys(PARTS).map(k=>{const q=cnt(r,ST.filter(s=>s.part===k));return `<div>${PARTS[k]} : <b>${q.done}/${q.t}</b>${q.n?` · ${q.n} non conf.`:''}${q.rest?` · <span style="color:var(--ko)">${q.rest} manquant(s)</span>`:' ✓'}</div>`}).join('')}</div>
 ${miss.length?`<h2>Il reste des contrôles à faire :</h2>${miss.map(s=>`<button class="st k" data-a="open" data-id="${s.id}"><div>${esc(s.titre)}</div><span>${cnt(r,[s]).rest} restant(s)</span></button>`).join('')}`:'<div class="card">Tous les contrôles ont reçu une réponse.</div>'}
 <button class="btn" data-a="fin" ${c.rest?'disabled':''}>TERMINER LA RONDE</button>`}
-function rep(){const r=DB.rondes.find(x=>x.id===V.id),s=r.sum,nc=ST.flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC').map(p=>({t,p,x:r.r[p.k]})));
+function rep(){const r=DB.rondes.find(x=>x.id===V.id),s=r.sum,nc=STR(r).flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC').map(p=>({t,p,x:r.r[p.k]})));
 return `<div class="bar noprint"><button class="btn small sec" data-a="go" data-s="hist">‹ Historique</button><b>Ronde</b><span></span></div>
-<h1>RONDE DU ${fd(r.debut)}</h1><div class="big">${esc(r.agent)} · ${ft(r.debut)} → ${r.fin?ft(r.fin)+' ('+dur(r)+')':'en cours'}<br>
+<h1>RONDE DU ${fd(r.debut)}</h1><h2 style="margin-top:0">${PARTS[r.type]}</h2><div class="big">${esc(r.agent)} · ${ft(r.debut)} → ${r.fin?ft(r.fin)+' ('+dur(r)+')':'en cours'}<br>
 <b>${s.done}</b> vérifications réalisées<br><b>${s.c}</b> conformes<br><b>${s.n}</b> non conformes<br><b>${s.rest}</b> contrôle manquant</div>
 <button class="btn" data-a="pdf" data-r="${r.id}">⬇ EXPORTER LE PDF</button>
-${nc.length?'<h2>Anomalies</h2>':''}${nc.map(({t,p,x})=>`<div class="card"><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)} · ${esc(x.lieu)}${x.ent?' · entrée '+esc(x.ent):''}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
+${nc.length?'<h2>Anomalies</h2>':''}${nc.map(({t,p,x})=>`<div class="card"><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)}${x.lieu&&x.lieu!==t.titre?' · '+esc(x.lieu):''}${x.ent?' · entrée '+esc(x.ent):''}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
 <br><select data-a="suivi" data-r="${r.id}" data-k="${p.k}">${['À traiter','En cours','Levée'].map(o=>`<option ${o===x.suivi?'selected':''}>${o}</option>`).join('')}</select></div>`).join('')}
 <button class="btn sec" data-a="csv" data-r="${r.id}">Exporter le détail (CSV / Excel)</button>`}
 function hist(){const l=DB.rondes.filter(r=>r.statut==='clôturée').reverse();
 return `<div class="bar"><button class="btn small sec" data-a="go" data-s="home">‹ Accueil</button><b>Historique</b><span></span></div>
-${l.length?l.map(r=>`<button class="st ${r.sum.n?'k':'d'}" data-a="rep" data-r="${r.id}"><div><b>${fd(r.debut)}</b><br><small>${esc(r.agent)}</small></div><span>${r.sum.c} ✓ · ${r.sum.n} ✕</span></button>`).join(''):'<div class="card">Aucune ronde terminée.</div>'}`}
-function anom(){const l=DB.rondes.filter(r=>r.statut==='clôturée').reverse().flatMap(r=>ST.flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC'&&r.r[p.k].suivi!=='Levée').map(p=>({r,t,p,x:r.r[p.k]}))));
+${l.length?l.map(r=>`<button class="st ${r.sum.n?'k':'d'}" data-a="rep" data-r="${r.id}"><div><b>${fd(r.debut)}</b><br><small>${PARTS[r.type]} · ${esc(r.agent)}</small></div><span>${r.sum.c} ✓ · ${r.sum.n} ✕</span></button>`).join(''):'<div class="card">Aucune ronde terminée.</div>'}`}
+function anom(){const l=DB.rondes.filter(r=>r.statut==='clôturée').reverse().flatMap(r=>STR(r).flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC'&&r.r[p.k].suivi!=='Levée').map(p=>({r,t,p,x:r.r[p.k]}))));
 return `<div class="bar"><button class="btn small sec" data-a="go" data-s="home">‹ Accueil</button><b>Anomalies à traiter</b><span></span></div>
-${l.length?l.map(({r,t,p,x})=>`<div class="card"><small>Ronde du ${fd(r.debut)}</small><br><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)} · ${esc(x.lieu)}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
+${l.length?l.map(({r,t,p,x})=>`<div class="card"><small>Ronde du ${fd(r.debut)} · ${PARTS[r.type]}</small><br><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)}${x.lieu&&x.lieu!==t.titre?' · '+esc(x.lieu):''}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
 <br><select data-a="suivi" data-r="${r.id}" data-k="${p.k}">${['À traiter','En cours','Levée'].map(o=>`<option ${o===x.suivi?'selected':''}>${o}</option>`).join('')}</select></div>`).join(''):'<div class="card">Aucune anomalie ouverte.</div>'}`}
 function sheet(){const {p,s}=PK[M.k],x=M.x;
 return `<div class="modal"><div class="sheet"><h1 style="color:var(--ko)">ANOMALIE</h1><div class="lib"><b>${p.id}</b>${esc(p.lib)}</div>
@@ -182,24 +192,26 @@ function render(keep){const a=$('#app');a.innerHTML={home,list,st:station,recap,
 function cn(){const s=ST.find(x=>x.id===V.id),k=cnt(cur(),[s]);$('#cn').textContent=k.done+'/'+k.t}
 function upd(k){const el=document.querySelector(`[data-row="${k}"]`),r=cur();el.outerHTML=row(r,PK[k].p);cn()}
 function nextRow(k){const rs=[...document.querySelectorAll('.pt')],i=rs.findIndex(e=>e.dataset.row===k),n=rs.slice(i+1).find(e=>!e.classList.contains('C')&&!e.classList.contains('NC'));if(n)n.scrollIntoView({behavior:'smooth',block:'center'})}
-function csv(r){const L=[['Date','Heure','Contrôleur','Bâtiment','Entrée','Niveau','Point','Famille','Libellé','Résultat','Lieu anomalie','Commentaire','Photo','Suivi','Mode']];
-ST.forEach(s=>s.pts.forEach(p=>{const x=r.r[p.k];L.push([x?fd(x.t):'',x?ft(x.t):'',r.agent,'LA TOUR',s.ent||(x&&x.ent)||'',s.titre.split(' | ')[0],p.id,p.fam,p.lib,x?(x.v==='C'?'Conforme':'Non conforme'):'MANQUANT',x&&x.lieu||'',x&&x.com||'',x&&x.ph?'oui':'',x&&x.suivi||'',x?(x.bloc?'en bloc':'unitaire'):''])}));
+function csv(r){/* une ligne par point de la ronde */const L=[['Date','Heure','Contrôleur','Bâtiment','Entrée','Niveau','Point','Famille','Libellé','Résultat','Lieu anomalie','Commentaire','Photo','Suivi','Mode']];
+STR(r).forEach(s=>s.pts.forEach(p=>{const x=r.r[p.k];L.push([x?fd(x.t):'',x?ft(x.t):'',r.agent,'LA TOUR',s.ent||(x&&x.ent)||'',s.titre,p.id,p.fam,p.lib,x?(x.v==='C'?'Conforme':'Non conforme'):'MANQUANT',x&&x.lieu||'',x&&x.com||'',x&&x.ph?'oui':'',x&&x.suivi||'',x?(x.bloc?'en bloc':'unitaire'):''])}));
 const t='\ufeff'+L.map(l=>l.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n'),b=new Blob([t],{type:'text/csv'});
-if(NATIVE)return Native.saveAndShare(b,fname(r)+'.csv',fname(r).slice(0,10));
+if(NATIVE)return Native.saveAndShare(b,fname(r)+'.csv',day(r));
 const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fname(r)+'.csv';a.click()}
 
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.tagName==='SELECT')return;const a=b.dataset.a,r=cur();
 if(a==='go'){V={s:b.dataset.s};render()}
-else if(a==='new'){const n=$('#ag').value.trim();if(!n){$('#ag').focus();return}DB.agent=n;const id=Date.now();DB.rondes.push({id,debut:new Date().toISOString(),agent:n,statut:'en cours',r:{}});DB.cur=id;save();V={s:'list'};render()}
-else if(a==='open'){TAB=ST.find(s=>s.id===b.dataset.id).part;V={s:'st',id:b.dataset.id};render()}
-else if(a==='tab'){TAB=b.dataset.p;render()}
+else if(a==='new'){const n=$('#ag').value.trim(),t=b.dataset.t;if(!n){$('#ag').focus();$('#ag').style.borderColor='var(--ko)';return}
+ if(!confirm('Démarrer la ronde « '+PARTS[t]+' » ?'))return;
+ DB.agent=n;const id=Date.now();DB.rondes.push({id,type:t,debut:new Date().toISOString(),agent:n,statut:'en cours',r:{}});DB.cur=id;save();V={s:'list'};render()}
+else if(a==='resume'){DB.cur=+b.dataset.r;save();V={s:'list'};render()}
+else if(a==='open'){V={s:'st',id:b.dataset.id};render()}
 else if(a==='all'){const s=ST.find(x=>x.id===b.dataset.id),n=cnt(r,[s]).rest;if(!confirm('Mettre '+n+' point(s) restant(s) en CONFORME ?\nSi un point est à signaler, appuyez ensuite sur Non conforme.'))return;const t=new Date().toISOString();s.pts.forEach(p=>{if(!r.r[p.k])r.r[p.k]={v:'C',t,bloc:true}});save();render(true)}
 else if(a==='c'){r.r[b.dataset.k]={v:'C',t:new Date().toISOString()};save();upd(b.dataset.k);nextRow(b.dataset.k)}
 else if(a==='nc'){const k=b.dataset.k,o=r.r[k]&&r.r[k].v==='NC'?r.r[k]:{},s=PK[k].s;M={k,x:{lieu:o.lieu||s.titre.split(' | ')[0],ent:o.ent||s.ent,com:o.com||'',ph:o.ph||''}};render(true)}
 else if(a==='cancel'){M=null;render(true)}
 else if(a==='save'){const com=$('#com').value.trim();if(!com){$('#com').focus();$('#com').style.borderColor='var(--ko)';return}
 r.r[M.k]={v:'NC',t:new Date().toISOString(),lieu:$('#lieu').value.trim(),ent:$('#ent').value,com,ph:M.x.ph,suivi:'À traiter'};save();const k=M.k;M=null;render(true);nextRow(k)}
-else if(a==='fin'){if(!confirm('Clôturer la ronde ? Elle ne sera plus modifiable.'))return;r.statut='clôturée';r.fin=new Date().toISOString();r.sum=cnt(r);DB.cur=null;save();V={s:'rep',id:r.id};render()}
+else if(a==='fin'){if(!confirm('Clôturer la ronde « '+PARTS[r.type]+' » ? Elle ne sera plus modifiable.'))return;r.statut='clôturée';r.fin=new Date().toISOString();r.sum=cnt(r);DB.cur=null;save();V={s:'rep',id:r.id};render()}
 else if(a==='rep'){V={s:'rep',id:+b.dataset.r};render()}
 else if(a==='pdf'){exportPDF(DB.rondes.find(x=>x.id==b.dataset.r))}
 else if(a==='csv'){csv(DB.rondes.find(x=>x.id==b.dataset.r))}});

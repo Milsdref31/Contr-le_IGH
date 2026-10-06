@@ -4,6 +4,16 @@ Application de ronde hebdomadaire de sécurité de l'IGH « LA TOUR » :
 Conforme / Non conforme pour chaque point, fiche anomalie avec photo, clôture bloquée tant qu'il manque un contrôle,
 historique, suivi des anomalies, export PDF et CSV.
 
+Trois rondes indépendantes, choisies depuis l'accueil (chacune a sa clôture, son PDF, son historique) :
+
+| Ronde | Parcours | Points |
+|---|---|---|
+| Entrée n°1 | Hall → R+18 … RDC → Centrale de désenfumage (SSI) | 345 |
+| Entrée n°3 | idem | 345 |
+| Général | Extérieur → Toiture-terrasse | 14 |
+
+Fichiers : `AAAA-MM-JJ_Ronde_LA-TOUR_Entree-1.pdf` (ou `Entree-3`, `General`).
+
 Une seule base de code, deux façons de l'utiliser :
 
 | | Appli web (Netlify) | APK Android |
