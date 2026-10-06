@@ -86,7 +86,15 @@ function planRappels() {
   }
   return list;
 }
-function majRappels() { if (NATIVE) Native.planReminders(planRappels()); }
+function majRappels() {
+  if (!(NATIVE && Native)) return;
+  try { Native.planReminders(planRappels()); }        // asynchrone : ne bloque jamais l'écran
+  catch (e) { console.warn('Rappels non programmés', e); }
+}
+/* Dans l'APK, si le pont natif n'a pas pu démarrer, on le dit au lieu de ne rien faire. */
+function natifIndispo() {
+  alert('Export impossible : module Android indisponible (' + (window.NATIVE_ERROR || 'inconnu') + ').');
+}
 
 /* ---------- Fichiers exportés : AAAA-MM-JJ_Ronde_LA-TOUR_Entree-1.pdf ---------- */
 const SLUG = { e1: 'Entree-1', e3: 'Entree-3', g: 'General' };
@@ -107,7 +115,7 @@ async function exportPDF(r) {
   const doc = makePDF(r, stationsDe(r), { [r.type]: RONDES[r.type].nom },
     { fd, ft, dur, cnt, logo: LOGO, label: RONDES[r.type].nom });
   const name = fname(r) + '.pdf';
-  if (NATIVE) return Native.saveAndShare(doc.output('blob'), name, day(r));
+  if (NATIVE) return Native ? Native.saveAndShare(doc.output('blob'), name, day(r)) : natifIndispo();
   const f = new File([doc.output('blob')], name, { type: 'application/pdf' });
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
     try { await navigator.share({ files: [f], title: name }); return; }
@@ -128,7 +136,7 @@ async function exportCSV(r) {
   }));
   const txt = '﻿' + L.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
   const b = new Blob([txt], { type: 'text/csv' });
-  if (NATIVE) return Native.saveAndShare(b, fname(r) + '.csv', day(r));
+  if (NATIVE) return Native ? Native.saveAndShare(b, fname(r) + '.csv', day(r)) : natifIndispo();
   const f = new File([b], fname(r) + '.csv', { type: 'text/csv' });
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
     try { await navigator.share({ files: [f], title: f.name }); return; }
@@ -387,10 +395,10 @@ function cloturer(r, motif) {
   if (motif) { r.incomplete = true; r.motif = motif; }
   DB.cur = null;
   save();
-  majRappels();
   V = { s: 'rep', id: r.id };
   M = null;
   render();
+  majRappels();
 }
 
 /* ---------- Actions (un seul gestionnaire pour tous les boutons data-a) ---------- */

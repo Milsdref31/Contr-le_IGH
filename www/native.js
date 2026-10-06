@@ -8,9 +8,18 @@
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = (() => {
   if (!NATIVE) return null;
-  const Filesystem = Capacitor.registerPlugin('Filesystem');
-  const Share = Capacitor.registerPlugin('Share');
-  const App = Capacitor.registerPlugin('App');
+  try {
+  /* Dans l'APK, Android injecte chaque plugin dans window.Capacitor.Plugins.
+     (Capacitor.registerPlugin n'existe que si la bibliothèque @capacitor/core est chargée :
+     ce n'est pas le cas ici, l'appli n'ayant pas d'étape de compilation.) */
+  const plugin = nom => {
+    const p = (Capacitor.Plugins && Capacitor.Plugins[nom]) || (Capacitor.registerPlugin && Capacitor.registerPlugin(nom));
+    if (!p) throw new Error('Plugin natif absent : ' + nom);
+    return p;
+  };
+  const Filesystem = plugin('Filesystem');
+  const Share = plugin('Share');
+  const App = plugin('App');
   const DOSSIER = 'Ronde LA TOUR';
 
   const toBase64 = blob => new Promise((ok, ko) => {
@@ -76,7 +85,7 @@ const Native = (() => {
 
   /* Rappels hebdomadaires (notifications locales, sans serveur).
      list = [{ at: Date, body: texte }]. Remplace tous les rappels déjà programmés. */
-  const LN = Capacitor.registerPlugin('LocalNotifications');
+  const LN = plugin('LocalNotifications');
   const ID0 = 1000;   // plage d'identifiants réservée aux rappels : 1000 à 1099
   async function planReminders(list) {
     try {
@@ -104,4 +113,10 @@ const Native = (() => {
   }
 
   return { saveAndShare, toast, planReminders };
+  } catch (e) {
+    /* Ne jamais bloquer l'appli : sans pont natif, les exports affichent un message clair. */
+    console.error('Pont natif indisponible', e);
+    window.NATIVE_ERROR = String(e && e.message || e);
+    return null;
+  }
 })();
