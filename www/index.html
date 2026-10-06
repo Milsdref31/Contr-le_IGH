@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14364a">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<title>Ronde LA TOUR</title>
+<style>
+:root{--bg:#eef1f3;--card:#fff;--ink:#14212b;--mut:#5b6b77;--line:#d5dce1;--pri:#14364a;--ok:#1b7f4c;--okb:#e0f3e8;--ko:#c0392b;--kob:#fbe4e1;--warn:#b26a00}
+@media(prefers-color-scheme:dark){:root{--bg:#0f171d;--card:#182430;--ink:#e8eef2;--mut:#93a4b1;--line:#2b3b48;--pri:#7fb8d6;--ok:#4cc98a;--okb:#143326;--ko:#ff7b6b;--kob:#3a1c19;--warn:#f0a63a}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 "Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--bg);z-index:6}
+#app{max-width:640px;margin:0 auto;padding:12px 12px 90px}
+h1{font-size:22px;margin:8px 0}h2{font-size:14px;color:var(--mut);margin:18px 0 6px;font-weight:600}
+.bar{position:sticky;top:env(safe-area-inset-top);z-index:5;background:var(--pri);color:#fff;margin:0 -12px 10px;padding:10px 14px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+@media(prefers-color-scheme:dark){.bar{background:#0b2231;color:#e8eef2}}
+.bar b{font-size:17px}.bar small{opacity:.85}
+button,select,input,textarea{font:inherit;color:inherit}
+.btn{border:0;border-radius:12px;padding:14px;font-weight:700;background:var(--pri);color:#fff;width:100%;margin:6px 0;cursor:pointer}
+@media(prefers-color-scheme:dark){.btn{color:#0b2231}}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.4}
+.btn.small{width:auto;padding:8px 12px;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+input,textarea,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin:4px 0 10px}
+.st{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:12px;margin:6px 0;cursor:pointer}
+.st.d{border-left-color:var(--ok)}.st.p{border-left-color:var(--warn)}.st.k{border-left-color:var(--ko)}
+.st span{color:var(--mut);font-size:14px;white-space:nowrap}
+.fam{font-weight:700;margin:16px 0 4px;color:var(--pri)}
+.pt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
+.pt.C{border-color:var(--ok);background:var(--okb)}.pt.NC{border-color:var(--ko);background:var(--kob)}
+.lib b{color:var(--mut);margin-right:6px}
+.bt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.bt button{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:16px 4px;font-weight:800;font-size:15px;cursor:pointer}
+.bt .c{color:var(--ok);border-color:var(--ok)}.bt .n{color:var(--ko);border-color:var(--ko)}
+.pt.C .bt .c{background:var(--ok);color:#fff}.pt.NC .bt .n{background:var(--ko);color:#fff}
+.note{font-size:14px;margin-top:6px;color:var(--ko)}
+.modal{position:fixed;inset:0;background:#000a;display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.sheet{background:var(--card);width:100%;max-width:640px;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet img,.card img{max-width:100%;border-radius:8px;margin-top:6px}
+.big{font-size:15px;line-height:1.7}.big b{font-size:20px}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.kpi div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 2px}.kpi b{display:block;font-size:22px}
+.kpi small{color:var(--mut)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+.tab{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 2px;font-weight:700;cursor:pointer}
+.tab small{display:block;color:var(--mut);font-weight:400}
+.tab.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+@media(prefers-color-scheme:dark){.tab.on{color:#0b2231}}
+.tm{font-size:12px;color:var(--mut);margin-top:4px}
+@media print{.bar,.noprint,.btn{display:none!important}body{background:#fff;color:#000}}
+</style></head><body><div id="app"></div>
+<script src="jspdf.umd.min.js"></script><script src="pdf.js"></script><script src="native.js"></script>
+<script>
+/* ===== CATALOGUE : modifiez ici si besoin =====
+   [n°, famille, libellé, fréquence]  o = une fois par ronde · l = à chaque niveau ET chaque entrée */
+const NIVEAUX=[];for(let i=18;i>=1;i--)NIVEAUX.push('R+'+i);NIVEAUX.push('RDC');
+const ENTREES=[1,3];
+const P=[
+['1.1','Extérieur','Voie publique / portail / barrières : voie accessible','o'],
+['1.2','Extérieur','Absence de stationnement gênant','o'],
+['1.3','Extérieur','Absence d’encombrants sur les voies et façades','o'],
+['1.4','Extérieur','Accès à l’alimentation des colonnes sèches : signalétique présente et état général','o'],
+['1.5','Extérieur','Porte d’entrée : ouverture correcte et complète','o'],
+['1.6','Extérieur','Vérification du local poubelles','o'],
+['1.7','Extérieur','Vérification du local surpresseur','o'],
+['1.8','Extérieur','Vérification du local ménage','o'],
+['2.1','Hall','Hall non encombré, y compris le demi-niveau d’accès à la cage d’escalier et aux ascenseurs','o'],
+['3.1','Escalier','Escalier libre de tout encombrement / dépôt / squat','l'],
+['3.2','Escalier','État général : propreté, sol non glissant, main courante, fenêtres à châssis fixe','l'],
+['3.3','Escalier','Éclairage de sécurité en fonctionnement (niveau et demi-niveau)','l'],
+['4.1','Portes coupe-feu','Fermeture complète de chaque battant','l'],
+['4.2','Portes coupe-feu','État général et étanchéité','l'],
+['5.1','Éclairages','Éclairage / plafonnier fonctionnel','l'],
+['5.2','Éclairages','Éclairage de sécurité fonctionnel','l'],
+['6.1','Encombrement','Palier libre de tout encombrement / dépôt','l'],
+['7.1','Placards / volumes techniques','Fermés et verrouillés (gaz, vide-ordures, électrique…)','l'],
+['7.2','Placards / volumes techniques','Aucun dépôt','l'],
+['7.3','Placards / volumes techniques','Tableaux électriques correctement fermés','l'],
+['7.4','Placards / volumes techniques','Absence de câbles apparents ou dénudés / pièces nues sous tension','l'],
+['8.1','Désenfumage','Volets de désenfumage : présence de la grille','l'],
+['8.2','Désenfumage','État apparent général non dégradé (visible depuis le placard électrique)','l'],
+['9.1','Colonnes sèches','Fermeture des robinets','l'],
+['9.2','Colonnes sèches','Présence et fermeture des bouchons','l'],
+['10.1','Détection incendie','Témoin lumineux fonctionnel','l'],
+['11.1','Documents affichés','Présence des plans d’évacuation et consignes','l'],
+['12.1','Toiture-terrasse','Accès verrouillés / grilles','o'],
+['12.2','Toiture-terrasse','Cheminements','o'],
+['12.3','Toiture-terrasse','Garde-corps','o'],
+['12.4','Toiture-terrasse','Cheminées','o'],
+['12.5','Toiture-terrasse','Locaux « machinerie ascenseurs »','o'],
+['12.6','Toiture-terrasse','Absence de signe d’activité autre que la maintenance des installations techniques','o'],
+['13.1','Centrale de désenfumage','SSI en veille générale','o'],
+['13.2','Centrale de désenfumage','Absence de défaut / voyant orange ou rouge','o']];
+/* ===== ORDRE DE LA RONDE : modifiez ici ===== */
+const pick=f=>P.filter(p=>p[1]===f),lv=P.filter(p=>p[3]==='l');
+const mk=(id,titre,sous,ent,pts,part)=>({id,titre,sous,ent,part,pts:pts.map(p=>({k:id+'|'+p[0],id:p[0],fam:p[1],lib:p[2]}))});
+const ST=[mk('ext','Extérieur','Voie, portail, locaux','',pick('Extérieur'),'g'),
+mk('hall','Hall','Rez-de-chaussée','',pick('Hall'),'g'),
+mk('toit','Toiture-terrasse','','',pick('Toiture-terrasse'),'g')];
+ENTREES.forEach(e=>NIVEAUX.forEach(n=>ST.push(mk('e'+e+'-'+n,n+' | Entrée n°'+e,'Escalier, paliers, placards','n°'+e,lv,'e'+e))));
+ST.push(mk('centrale','Centrale de désenfumage','SSI','',pick('Centrale de désenfumage'),'g'));
+const PK={};ST.forEach(s=>s.pts.forEach(p=>PK[p.k]={p,s}));
+const TOTAL=ST.reduce((a,s)=>a+s.pts.length,0);
+const PARTS={g:'Général',e1:'Entrée n°1',e3:'Entrée n°3'};let TAB='g';
+
+/* ===== DONNÉES (stockées sur le téléphone) ===== */
+const KEY='ronde_latour_v1';
+let DB;try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+DB=DB||{rondes:[],cur:null,agent:''};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){alert('Mémoire du téléphone pleine. Exportez puis supprimez d’anciennes rondes.')}};
+const cur=()=>DB.rondes.find(r=>r.id===DB.cur);
+const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fd=i=>new Date(i).toLocaleDateString('fr-FR'),ft=i=>new Date(i).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+const cnt=(r,ss)=>{let c=0,n=0,t=0;(ss||ST).forEach(s=>s.pts.forEach(p=>{t++;const x=r.r[p.k];if(x)x.v==='C'?c++:n++}));return{t,c,n,rest:t-c-n,done:c+n}};
+const p2=n=>String(n).padStart(2,'0');
+const dur=r=>{const m=Math.round((new Date(r.fin)-new Date(r.debut))/60000);return m>=60?Math.floor(m/60)+' h '+p2(m%60):m+' min'};
+const fname=r=>{const t=new Date(r.debut);return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())+'_Ronde_LA-TOUR'};
+async function exportPDF(r){if(!window.jspdf){alert('Module PDF non chargé : ouvrez l’application une fois avec du réseau.');return}
+const d=makePDF(r,ST,PARTS,{fd,ft,dur,cnt,logo:LOGO}),name=fname(r)+'.pdf';
+if(NATIVE)return Native.saveAndShare(d.output('blob'),name,fname(r).slice(0,10));
+const f=new File([d.output('blob')],name,{type:'application/pdf'});
+if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:name});return}catch(e){if(e.name==='AbortError')return}}
+d.save(name)}
+/* Logo facultatif du PDF : déposez un fichier logo.png à côté de index.html */
+let LOGO=null;fetch('logo.png').then(x=>x.ok?x.blob():null).then(b=>{if(!b)return;const fr=new FileReader();fr.onload=()=>{LOGO=fr.result};fr.readAsDataURL(b)}).catch(()=>{});
+let V={s:'home'},M=null;
+
+/* ===== ÉCRANS ===== */
+function home(){const r=cur(),open=DB.rondes.filter(x=>x.statut==='clôturée').flatMap(x=>Object.values(x.r).filter(y=>y.v==='NC'&&y.suivi!=='Levée')).length;
+return `<h1>Ronde de sécurité<br>LA TOUR</h1>
+${r?`<div class="card"><b>Ronde en cours</b><br>${fd(r.debut)} · ${esc(r.agent)}<br>${cnt(r).done}/${TOTAL} points contrôlés</div><button class="btn" data-a="go" data-s="list">Reprendre la ronde</button>`:
+`<div class="card"><label>Contrôleur<input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom"></label></div><button class="btn" data-a="new">Démarrer une ronde</button>`}
+<button class="btn sec" data-a="go" data-s="hist">Historique des rondes</button>
+<button class="btn sec" data-a="go" data-s="anom">Anomalies à traiter (${open})</button>`}
+function list(){const r=cur(),c=cnt(r),tabs=Object.keys(PARTS).map(k=>{const q=cnt(r,ST.filter(s=>s.part===k));return `<button class="tab ${TAB===k?'on':''}" data-a="tab" data-p="${k}">${PARTS[k]}<small>${q.done}/${q.t}${q.rest===0?' ✓':''}</small></button>`}).join('');
+return `<div class="bar"><div><b>${c.done}/${c.t}</b> <small>contrôlés · ${c.n} non conformes</small></div><button class="btn small sec" data-a="go" data-s="recap">Terminer</button></div>
+<div class="tabs">${tabs}</div>
+${ST.filter(s=>s.part===TAB).map(s=>{const k=cnt(r,[s]),bad=s.pts.some(p=>r.r[p.k]&&r.r[p.k].v==='NC');
+return `<button class="st ${k.rest===0?'d':k.done?'p':''} ${bad?'k':''}" data-a="open" data-id="${s.id}"><div><b>${esc(s.titre)}</b><br><small>${esc(s.sous)}</small></div><span>${k.done}/${k.t}${k.rest===0?' ✓':''}</span></button>`}).join('')}
+<button class="btn sec noprint" data-a="go" data-s="home">Accueil</button>`}
+function row(r,p){const x=r.r[p.k];return `<div class="pt ${x?x.v:''}" data-row="${p.k}"><div class="lib"><b>${p.id}</b>${esc(p.lib)}</div>
+<div class="bt"><button class="c" data-a="c" data-k="${p.k}">✓ CONFORME</button><button class="n" data-a="nc" data-k="${p.k}">✕ NON CONFORME</button></div>
+${x&&x.v==='NC'?`<div class="note">${esc(x.lieu)} · ${esc(x.com)}${x.ph?' · 📷':''}</div>`:''}${x?`<div class="tm">${ft(x.t)}${x.bloc?' · validé en bloc':''}</div>`:''}</div>`}
+function station(){const r=cur(),i=ST.findIndex(s=>s.id===V.id),s=ST[i],rest=cnt(r,[s]).rest;let f='';
+return `<div class="bar"><button class="btn small sec" data-a="go" data-s="list">‹ Liste</button><b>${esc(s.titre)}</b><small id="cn"></small></div>
+${rest?`<button class="btn sec" data-a="all" data-id="${s.id}">✓ Tout mettre conforme (${rest})</button>`:''}
+${s.pts.map(p=>(p.fam!==f?(f=p.fam,`<div class="fam">${esc(f)}</div>`):'')+row(r,p)).join('')}
+${ST[i+1]?`<button class="btn" data-a="open" data-id="${ST[i+1].id}">Suivant : ${esc(ST[i+1].titre)} ›</button>`:`<button class="btn" data-a="go" data-s="recap">Terminer la ronde</button>`}`}
+function recap(){const r=cur(),c=cnt(r),miss=ST.filter(s=>cnt(r,[s]).rest>0);
+return `<div class="bar"><button class="btn small sec" data-a="go" data-s="list">‹ Retour</button><b>Récapitulatif</b><span></span></div>
+<h1>RONDE DU ${fd(r.debut)}</h1>
+<div class="kpi"><div><b>${c.done}</b><small>réalisés</small></div><div><b style="color:var(--ok)">${c.c}</b><small>conformes</small></div><div><b style="color:var(--ko)">${c.n}</b><small>non conf.</small></div><div><b>${c.rest}</b><small>manquants</small></div></div>
+<div class="card">${Object.keys(PARTS).map(k=>{const q=cnt(r,ST.filter(s=>s.part===k));return `<div>${PARTS[k]} : <b>${q.done}/${q.t}</b>${q.n?` · ${q.n} non conf.`:''}${q.rest?` · <span style="color:var(--ko)">${q.rest} manquant(s)</span>`:' ✓'}</div>`}).join('')}</div>
+${miss.length?`<h2>Il reste des contrôles à faire :</h2>${miss.map(s=>`<button class="st k" data-a="open" data-id="${s.id}"><div>${esc(s.titre)}</div><span>${cnt(r,[s]).rest} restant(s)</span></button>`).join('')}`:'<div class="card">Tous les contrôles ont reçu une réponse.</div>'}
+<button class="btn" data-a="fin" ${c.rest?'disabled':''}>TERMINER LA RONDE</button>`}
+function rep(){const r=DB.rondes.find(x=>x.id===V.id),s=r.sum,nc=ST.flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC').map(p=>({t,p,x:r.r[p.k]})));
+return `<div class="bar noprint"><button class="btn small sec" data-a="go" data-s="hist">‹ Historique</button><b>Ronde</b><span></span></div>
+<h1>RONDE DU ${fd(r.debut)}</h1><div class="big">${esc(r.agent)} · ${ft(r.debut)} → ${r.fin?ft(r.fin)+' ('+dur(r)+')':'en cours'}<br>
+<b>${s.done}</b> vérifications réalisées<br><b>${s.c}</b> conformes<br><b>${s.n}</b> non conformes<br><b>${s.rest}</b> contrôle manquant</div>
+<button class="btn" data-a="pdf" data-r="${r.id}">⬇ EXPORTER LE PDF</button>
+${nc.length?'<h2>Anomalies</h2>':''}${nc.map(({t,p,x})=>`<div class="card"><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)} · ${esc(x.lieu)}${x.ent?' · entrée '+esc(x.ent):''}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
+<br><select data-a="suivi" data-r="${r.id}" data-k="${p.k}">${['À traiter','En cours','Levée'].map(o=>`<option ${o===x.suivi?'selected':''}>${o}</option>`).join('')}</select></div>`).join('')}
+<button class="btn sec" data-a="csv" data-r="${r.id}">Exporter le détail (CSV / Excel)</button>`}
+function hist(){const l=DB.rondes.filter(r=>r.statut==='clôturée').reverse();
+return `<div class="bar"><button class="btn small sec" data-a="go" data-s="home">‹ Accueil</button><b>Historique</b><span></span></div>
+${l.length?l.map(r=>`<button class="st ${r.sum.n?'k':'d'}" data-a="rep" data-r="${r.id}"><div><b>${fd(r.debut)}</b><br><small>${esc(r.agent)}</small></div><span>${r.sum.c} ✓ · ${r.sum.n} ✕</span></button>`).join(''):'<div class="card">Aucune ronde terminée.</div>'}`}
+function anom(){const l=DB.rondes.filter(r=>r.statut==='clôturée').reverse().flatMap(r=>ST.flatMap(t=>t.pts.filter(p=>r.r[p.k]&&r.r[p.k].v==='NC'&&r.r[p.k].suivi!=='Levée').map(p=>({r,t,p,x:r.r[p.k]}))));
+return `<div class="bar"><button class="btn small sec" data-a="go" data-s="home">‹ Accueil</button><b>Anomalies à traiter</b><span></span></div>
+${l.length?l.map(({r,t,p,x})=>`<div class="card"><small>Ronde du ${fd(r.debut)}</small><br><b>${p.id} ${esc(p.lib)}</b><br>${esc(t.titre)} · ${esc(x.lieu)}<br>${esc(x.com)}${x.ph?`<br><img src="${x.ph}">`:''}
+<br><select data-a="suivi" data-r="${r.id}" data-k="${p.k}">${['À traiter','En cours','Levée'].map(o=>`<option ${o===x.suivi?'selected':''}>${o}</option>`).join('')}</select></div>`).join(''):'<div class="card">Aucune anomalie ouverte.</div>'}`}
+function sheet(){const {p,s}=PK[M.k],x=M.x;
+return `<div class="modal"><div class="sheet"><h1 style="color:var(--ko)">ANOMALIE</h1><div class="lib"><b>${p.id}</b>${esc(p.lib)}</div>
+<label>Lieu<input id="lieu" value="${esc(x.lieu)}"></label>
+<label>Entrée<select id="ent">${['','n°1','n°3'].map(o=>`<option ${o===x.ent?'selected':''}>${o}</option>`).join('')}</select></label>
+<label>Observation<textarea id="com" rows="3">${esc(x.com)}</textarea></label>
+<label class="btn sec" style="display:block;text-align:center">📷 PRENDRE / JOINDRE UNE PHOTO<input id="ph" type="file" accept="image/*" capture="environment" hidden></label>
+<div id="pv">${x.ph?`<img src="${x.ph}">`:''}</div>
+<button class="btn" data-a="save">Enregistrer l’anomalie</button><button class="btn sec" data-a="cancel">Annuler</button></div></div>`}
+
+function render(keep){const a=$('#app');a.innerHTML={home,list,st:station,recap,rep,hist,anom}[V.s]()+(M?sheet():'');if(V.s==='st')cn();if(!keep)scrollTo(0,0)}
+function cn(){const s=ST.find(x=>x.id===V.id),k=cnt(cur(),[s]);$('#cn').textContent=k.done+'/'+k.t}
+function upd(k){const el=document.querySelector(`[data-row="${k}"]`),r=cur();el.outerHTML=row(r,PK[k].p);cn()}
+function nextRow(k){const rs=[...document.querySelectorAll('.pt')],i=rs.findIndex(e=>e.dataset.row===k),n=rs.slice(i+1).find(e=>!e.classList.contains('C')&&!e.classList.contains('NC'));if(n)n.scrollIntoView({behavior:'smooth',block:'center'})}
+function csv(r){const L=[['Date','Heure','Contrôleur','Bâtiment','Entrée','Niveau','Point','Famille','Libellé','Résultat','Lieu anomalie','Commentaire','Photo','Suivi','Mode']];
+ST.forEach(s=>s.pts.forEach(p=>{const x=r.r[p.k];L.push([x?fd(x.t):'',x?ft(x.t):'',r.agent,'LA TOUR',s.ent||(x&&x.ent)||'',s.titre.split(' | ')[0],p.id,p.fam,p.lib,x?(x.v==='C'?'Conforme':'Non conforme'):'MANQUANT',x&&x.lieu||'',x&&x.com||'',x&&x.ph?'oui':'',x&&x.suivi||'',x?(x.bloc?'en bloc':'unitaire'):''])}));
+const t='\ufeff'+L.map(l=>l.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n'),b=new Blob([t],{type:'text/csv'});
+if(NATIVE)return Native.saveAndShare(b,fname(r)+'.csv',fname(r).slice(0,10));
+const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fname(r)+'.csv';a.click()}
+
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.tagName==='SELECT')return;const a=b.dataset.a,r=cur();
+if(a==='go'){V={s:b.dataset.s};render()}
+else if(a==='new'){const n=$('#ag').value.trim();if(!n){$('#ag').focus();return}DB.agent=n;const id=Date.now();DB.rondes.push({id,debut:new Date().toISOString(),agent:n,statut:'en cours',r:{}});DB.cur=id;save();V={s:'list'};render()}
+else if(a==='open'){TAB=ST.find(s=>s.id===b.dataset.id).part;V={s:'st',id:b.dataset.id};render()}
+else if(a==='tab'){TAB=b.dataset.p;render()}
+else if(a==='all'){const s=ST.find(x=>x.id===b.dataset.id),n=cnt(r,[s]).rest;if(!confirm('Mettre '+n+' point(s) restant(s) en CONFORME ?\nSi un point est à signaler, appuyez ensuite sur Non conforme.'))return;const t=new Date().toISOString();s.pts.forEach(p=>{if(!r.r[p.k])r.r[p.k]={v:'C',t,bloc:true}});save();render(true)}
+else if(a==='c'){r.r[b.dataset.k]={v:'C',t:new Date().toISOString()};save();upd(b.dataset.k);nextRow(b.dataset.k)}
+else if(a==='nc'){const k=b.dataset.k,o=r.r[k]&&r.r[k].v==='NC'?r.r[k]:{},s=PK[k].s;M={k,x:{lieu:o.lieu||s.titre.split(' | ')[0],ent:o.ent||s.ent,com:o.com||'',ph:o.ph||''}};render(true)}
+else if(a==='cancel'){M=null;render(true)}
+else if(a==='save'){const com=$('#com').value.trim();if(!com){$('#com').focus();$('#com').style.borderColor='var(--ko)';return}
+r.r[M.k]={v:'NC',t:new Date().toISOString(),lieu:$('#lieu').value.trim(),ent:$('#ent').value,com,ph:M.x.ph,suivi:'À traiter'};save();const k=M.k;M=null;render(true);nextRow(k)}
+else if(a==='fin'){if(!confirm('Clôturer la ronde ? Elle ne sera plus modifiable.'))return;r.statut='clôturée';r.fin=new Date().toISOString();r.sum=cnt(r);DB.cur=null;save();V={s:'rep',id:r.id};render()}
+else if(a==='rep'){V={s:'rep',id:+b.dataset.r};render()}
+else if(a==='pdf'){exportPDF(DB.rondes.find(x=>x.id==b.dataset.r))}
+else if(a==='csv'){csv(DB.rondes.find(x=>x.id==b.dataset.r))}});
+document.addEventListener('change',e=>{const t=e.target;
+if(t.dataset.a==='suivi'){const r=DB.rondes.find(x=>x.id==t.dataset.r);r.r[t.dataset.k].suivi=t.value;save();if(V.s==='anom')render()}
+if(t.id==='ph'&&t.files[0]){M.x.lieu=$('#lieu').value;M.x.ent=$('#ent').value;M.x.com=$('#com').value;const im=new Image(),fr=new FileReader();
+fr.onload=()=>{im.onload=()=>{const q=900/Math.max(im.width,im.height,900),c=document.createElement('canvas');c.width=im.width*q;c.height=im.height*q;c.getContext('2d').drawImage(im,0,0,c.width,c.height);M.x.ph=c.toDataURL('image/jpeg',.6);$('#pv').innerHTML='<img src="'+M.x.ph+'">'};im.src=fr.result};fr.readAsDataURL(t.files[0])}});
+/* Bouton retour Android (APK) : écran précédent. Renvoie false sur l'accueil (= quitter). */
+const PREV={st:'list',list:'home',recap:'list',rep:'hist',hist:'home',anom:'home'};
+window.onBack=()=>{if(M){M=null;render(true);return true}const p=PREV[V.s];if(!p)return false;V={s:p};render();return true};
+if(!NATIVE&&'serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+render();
+</script></body></html>
