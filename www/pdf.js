@@ -2,7 +2,7 @@
 function makePDF(r,ST,PARTS,H){
 const d=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),W=210,Mx=14,CW=W-2*Mx;let y=0;
 const S=t=>String(t==null?'':t).replace(/[’‘]/g,"'").replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[^\x20-\x7E\u00A0-\u00FF]/g,'');
-const INK=[20,33,43],MUT=[91,107,119],PRI=[20,54,74],OK=[27,127,76],KO=[192,57,43],LINE=[225,230,234];
+const INK=[20,33,43],MUT=[91,107,119],PRI=[36,51,61],OK=[27,127,76],KO=[192,57,43],LINE=[225,230,234];
 const ensure=h=>{if(y+h>284){d.addPage();y=16}};
 const font=(sz,b,c)=>{d.setFont('helvetica',b?'bold':'normal');d.setFontSize(sz);d.setTextColor(...(c||INK))};
 const wrap=(t,sz,b,c,x,w,lh)=>{font(sz,b,c);const L=d.splitTextToSize(S(t),w);ensure(L.length*lh);L.forEach(l=>{d.text(l,x,y);y+=lh})};
@@ -19,15 +19,16 @@ y=40;
 wrap('Contrôleur : '+r.agent,10,false,INK,Mx,CW,5);
 wrap('Début : '+H.ft(r.debut)+'   Fin : '+(r.fin?H.ft(r.fin)+'   Durée : '+H.dur(r):'en cours'),10,false,INK,Mx,CW,5);
 wrap('Bâtiment : LA TOUR',10,false,INK,Mx,CW,5);
+if(r.incomplete){y+=2;wrap('RONDE CLÔTURÉE INCOMPLÈTE - '+cnt(r).rest+' point(s) sans réponse. Motif : '+r.motif,10,true,KO,Mx,CW,5)}
 y+=3;
 
 /* Chiffres clés */
-const c=cnt(r),bw=CW/4,box=[['réalisées',c.done,INK],['conformes',c.c,OK],['non conformes',c.n,c.n?KO:INK],['manquants',c.rest,c.rest?KO:INK]];
+const c=cnt(r),bw=CW/4,box=[['réalisées',c.done,INK],['conformes',c.c,OK],['non conformes',c.n,c.n?KO:INK],['sans réponse',c.rest,c.rest?KO:INK]];
 box.forEach((b,i)=>{const x=Mx+i*bw;d.setDrawColor(...LINE);d.setLineWidth(.3);d.rect(x,y,bw-3,17);font(17,true,b[2]);d.text(String(b[1]),x+(bw-3)/2,y+9,{align:'center'});font(8,false,MUT);d.text(b[0],x+(bw-3)/2,y+14,{align:'center'})});
 y+=24;
 
 /* Détail par partie */
-Object.keys(PARTS).forEach(k=>{const q=cnt(r,ST.filter(s=>s.part===k));
+Object.keys(PARTS).forEach(k=>{const q=cnt(r,ST.filter(s=>s.ronde===k));
  wrap(PARTS[k]+' : '+q.done+'/'+q.t+' contrôlés - '+q.c+' conformes - '+q.n+' non conformes'+(q.rest?' - '+q.rest+' MANQUANT(S)':''),9.5,false,q.rest?KO:INK,Mx,CW,5)});
 y+=5;
 
@@ -40,7 +41,7 @@ nc.forEach(({s,p,x})=>{ensure(30);
  wrap(p.id+' - '+p.lib,10,true,KO,Mx+3,CW-3,4.8);
  wrap(s.titre+'  |  Lieu : '+x.lieu+(x.ent?'  |  Entrée '+x.ent:'')+'  |  '+H.ft(x.t),9,false,MUT,Mx+3,CW-3,4.4);
  wrap('Observation : '+x.com,9.5,false,INK,Mx+3,CW-3,4.6);
- wrap('Suivi : '+(x.suivi||'À traiter'),9,true,INK,Mx+3,CW-3,4.6);
+ {const h=(x.hist||[]).slice(-1)[0];wrap('Suivi : '+(x.suivi||'À traiter')+(h?' (depuis le '+H.fd(h.t)+' '+H.ft(h.t)+')':''),9,true,INK,Mx+3,CW-3,4.6)}
  if(x.ph){try{const ip=d.getImageProperties(x.ph),sc=Math.min(70/ip.width,60/ip.height),w=ip.width*sc,h=ip.height*sc;ensure(h+3);d.addImage(x.ph,'JPEG',Mx+3,y,w,h);y+=h+2}catch(e){}}
  d.rect(Mx,y0,1.2,y-y0,'F');y+=5});
 
@@ -50,7 +51,7 @@ font(12,true,PRI);d.text('DÉTAIL DE TOUS LES CONTRÔLES',Mx,y);y+=2;d.setDrawCo
 wrap('* = validé en bloc avec « Tout mettre conforme » (heure du bloc).',8,false,MUT,Mx,CW,4);y+=2;
 Object.keys(PARTS).forEach(k=>{
  ensure(12);font(10.5,true,PRI);d.text(S(PARTS[k]).toUpperCase(),Mx,y);y+=5;
- ST.filter(s=>s.part===k).forEach(s=>{const q=cnt(r,[s]);
+ ST.filter(s=>s.ronde===k).forEach(s=>{const q=cnt(r,[s]);
   ensure(5.5+3.8*3);d.setFillColor(238,241,243);d.rect(Mx,y-3.6,CW,5,'F');
   font(8.5,true,INK);d.text(S(s.titre),Mx+1,y);font(8,false,MUT);d.text(q.c+'/'+q.t+' conformes',Mx+CW-1,y,{align:'right'});y+=5;
   s.pts.forEach(p=>{const x=r.r[p.k];font(7.5,false,INK);const L=d.splitTextToSize(S(p.lib),118),h=L.length*3.3+1;ensure(h);

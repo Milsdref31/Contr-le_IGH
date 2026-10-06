@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 RES = Path(__file__).resolve().parent.parent / "android/app/src/main/res"
-BG = (20, 54, 74, 255)
+BG = (36, 51, 61, 255)
 # Coche de icon.svg, repère 512 : (150,270) -> (220,340) -> (365,180), épaisseur 52
 CHECK = [(150, 270), (220, 340), (365, 180)]
 
@@ -60,5 +60,5 @@ for f in glob.glob(str(RES / "drawable*/splash.png")):
 
 (RES / "values/ic_launcher_background.xml").write_text(
     '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-    '    <color name="ic_launcher_background">#14364A</color>\n</resources>\n')
+    '    <color name="ic_launcher_background">#24333D</color>\n</resources>\n')
 print("Icônes et splash générés.")

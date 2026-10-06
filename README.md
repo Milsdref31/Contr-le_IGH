@@ -28,15 +28,26 @@ Les données restent sur le téléphone (aucun serveur). Désinstaller l'APK eff
 ## Organisation
 
 ```
-www/                  appli (HTML/JS, sans build)
-  index.html          écrans + CATALOGUE des points (en tête du script) + ordre de la ronde
-  pdf.js              mise en page du PDF
+www/                  appli (HTML/CSS/JS, sans build)
+  index.html          page unique, charge les scripts dans l'ordre
+  catalogue.js        POINTS DE CONTRÔLE, niveaux, entrées, ordre des rondes  <- à modifier ici
+  app.js              écrans, actions, stockage, exports
+  style.css           mise en forme (couleurs signalétique sécurité, police Barlow)
+  pdf.js              mise en page du rapport PDF
   native.js           pont Android (fichiers, partage, bouton retour) — inactif dans un navigateur
+  fonts/              police Barlow (licence OFL) embarquée pour le hors-ligne
   logo.png            (facultatif) logo affiché en haut à droite du PDF
 android/              projet Android généré par Capacitor (icônes, manifeste, signature)
 tools/make_icons.py   régénère icônes et écran de démarrage
 .github/workflows/apk.yml   construit l'APK à chaque envoi sur main
 ```
+
+Règles de la ronde :
+- chaque point reçoit Conforme ou Non conforme (observation obligatoire, photo facultative) ;
+- « Tout mettre conforme » ne remplit que les points sans réponse et les marque « validé en bloc » ;
+- clôture normale quand tous les points ont une réponse ; sinon « Clôturer quand même » exige un motif
+  et la ronde est marquée **incomplète** (écran, PDF) ;
+- le suivi d'une anomalie (À traiter / En cours / Levée) garde la date de chaque changement.
 
 ## Obtenir l'APK
 

@@ -1,4 +1,4 @@
-const C='ronde-v4',F=['./','index.html','pdf.js','native.js','jspdf.umd.min.js','manifest.webmanifest','icon.svg'];
+const C='ronde-v5',F=['./','index.html','style.css','catalogue.js','app.js','pdf.js','native.js','fonts/barlow-latin-400-normal.woff2','fonts/barlow-latin-600-normal.woff2','fonts/barlow-latin-700-normal.woff2','fonts/barlow-condensed-latin-700-normal.woff2','jspdf.umd.min.js','manifest.webmanifest','icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(F)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r}).catch(()=>caches.match(e.request))));
