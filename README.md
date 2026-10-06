@@ -36,9 +36,9 @@ www/                  appli (HTML/CSS/JS, sans build)
   pdf.js              mise en page du rapport PDF
   native.js           pont Android (fichiers, partage, bouton retour) — inactif dans un navigateur
   fonts/              police Barlow (licence OFL) embarquée pour le hors-ligne
-  logo.png            (facultatif) logo affiché en haut à droite du PDF
+  icon.svg, logo.png  logo « coche + IGH » (accueil, PDF) — généré par tools/make_logo.py
 android/              projet Android généré par Capacitor (icônes, manifeste, signature)
-tools/make_icons.py   régénère icônes et écran de démarrage
+tools/make_logo.py    dessine le logo et régénère toutes les icônes (appli, web, notifications, démarrage)
 .github/workflows/apk.yml   construit l'APK à chaque envoi sur main
 ```
 

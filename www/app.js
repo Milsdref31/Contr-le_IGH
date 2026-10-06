@@ -177,7 +177,7 @@ function home() {
   const semaine = reste.length
     ? `<div class="box warn"><b>${reste.length === 3 ? 'Les 3 contrôles' : plural(reste.length, 'contrôle')} de la semaine à faire</b><br>${reste.map(t => RONDES[t].nom).join(', ')}</div>`
     : `<div class="box" style="border-color:var(--safe);background:var(--safe-bg)"><b>Contrôles de la semaine terminés.</b><br>Prochain rappel lundi à ${RAPPEL.heure} h ${p2(RAPPEL.minute)}.</div>`;
-  return `<div class="hero"><h1>LA TOUR</h1><p>Ronde de sécurité hebdomadaire</p></div>
+  return `<div class="hero"><img class="mark" src="icon.svg" alt="IGH"><div><h1>LA TOUR</h1><p>Ronde de sécurité hebdomadaire</p></div></div>
   ${semaine}
   <div class="agent"><label for="ag">Contrôleur</label><input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom" autocomplete="name"></div>
   <h2>Choisissez la ronde à faire</h2>

@@ -12,9 +12,9 @@ const cnt=H.cnt;
 d.setFillColor(...PRI);d.rect(0,0,W,30,'F');
 d.setTextColor(255,255,255);d.setFont('helvetica','bold');d.setFontSize(18);d.text('RONDE DE SÉCURITÉ - LA TOUR',Mx,13);
 d.setFont('helvetica','normal');d.setFontSize(11);d.text((H.label?H.label+'  -  ':'')+'Ronde du '+H.fd(r.debut),Mx,21.5);
-/* Logo facultatif (www/logo.png), en haut à droite sur fond blanc */
-if(H.logo){try{const ip=d.getImageProperties(H.logo),sc=Math.min(40/ip.width,20/ip.height),w=ip.width*sc,h=ip.height*sc,x=W-Mx-w,y0=(30-h)/2;
- d.setFillColor(255,255,255);d.roundedRect(x-2,y0-2,w+4,h+4,1.5,1.5,'F');d.addImage(H.logo,ip.fileType||'PNG',x,y0,w,h)}catch(e){}}
+/* Logo (www/logo.png, même couleur de fond que le bandeau), en haut à droite */
+if(H.logo){try{const ip=d.getImageProperties(H.logo),sc=Math.min(26/ip.width,26/ip.height),w=ip.width*sc,h=ip.height*sc,x=W-Mx-w,y0=(30-h)/2;
+ d.addImage(H.logo,ip.fileType||'PNG',x,y0,w,h)}catch(e){}}
 y=40;
 wrap('Contrôleur : '+r.agent,10,false,INK,Mx,CW,5);
 wrap('Début : '+H.ft(r.debut)+'   Fin : '+(r.fin?H.ft(r.fin)+'   Durée : '+H.dur(r):'en cours'),10,false,INK,Mx,CW,5);

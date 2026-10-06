@@ -72,6 +72,8 @@ p{margin:6px 0}
 
 /* ===== Accueil ===== */
 .hero{background:var(--bar);color:var(--on-bar);margin:0 -14px;padding:22px 14px 18px}
+.hero{display:flex;align-items:center;gap:14px}
+.hero .mark{width:64px;height:64px;flex:none}
 .hero h1{margin:0;font-size:38px}
 .hero p{opacity:.8;margin:2px 0 0}
 .agent{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:4px 4px 4px 14px;margin-top:14px}
