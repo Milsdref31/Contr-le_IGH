@@ -9,6 +9,12 @@ const KEY = 'ronde_latour_v3';        // v3 : une ronde par entrée. Les donnée
 let DB;
 try { DB = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* stockage illisible : on repart à vide */ }
 DB = DB || { rondes: [], cur: null, agent: '' };
+/* Migration : avant le 07/10/2026, la centrale SSI était une étape séparée (clé « e1-centrale|13.1 »).
+   Ses réponses sont rattachées au niveau qui porte désormais la SSI (voir NIVEAU_SSI). */
+DB.rondes.forEach(r => Object.keys(r.r).forEach(k => {
+  const m = k.match(/^e(\d)-centrale\|(.+)$/);
+  if (m && NIVEAU_SSI[m[1]]) { r.r['e' + m[1] + '-' + NIVEAU_SSI[m[1]] + '|' + m[2]] = r.r[k]; delete r.r[k]; }
+}));
 
 /* Enregistrement automatique : appelé à chaque réponse, saisie, changement d'écran
    et quand l'appli passe en arrière-plan. Rien n'est jamais à « enregistrer » à la main. */

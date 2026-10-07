@@ -8,8 +8,8 @@ Trois rondes indépendantes, choisies depuis l'accueil (chacune a sa clôture, s
 
 | Ronde | Parcours | Points |
 |---|---|---|
-| Entrée n°1 | Hall → RDC, R+1 … R+18 → Centrale de désenfumage (SSI) | 345 |
-| Entrée n°3 | idem | 345 |
+| Entrée n°1 | R+18 … R+1 → RDC (+ centrale SSI) → Hall | 345 |
+| Entrée n°3 | R+18 … R+1 (+ centrale SSI) → RDC → Hall | 345 |
 | Général | Extérieur → Toiture-terrasse | 14 |
 
 Fichiers : `AAAA-MM-JJ_Ronde_LA-TOUR_Entree-1.pdf` (ou `Entree-3`, `General`).

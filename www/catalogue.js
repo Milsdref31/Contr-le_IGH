@@ -3,12 +3,15 @@
    C'est le seul fichier à modifier pour ajouter / retirer / renommer un point.
    ===================================================================== */
 
-/* Niveaux parcourus dans chaque entrée, dans l'ordre de la ronde : après le hall, RDC puis montée jusqu'au R+18. */
-const NIVEAUX = ['RDC'];
-for (let i = 1; i <= 18; i++) NIVEAUX.push('R+' + i);
+/* Niveaux parcourus dans chaque entrée, dans l'ordre de la ronde : descente du R+18 au RDC, puis le hall. */
+const NIVEAUX = [];
+for (let i = 18; i >= 1; i--) NIVEAUX.push('R+' + i);
+NIVEAUX.push('RDC');
 
-/* Entrées concernées. */
+/* Entrées concernées, et niveau où se trouve la centrale de désenfumage (SSI) de chacune :
+   ses points sont contrôlés avec ce niveau. */
 const ENTREES = [1, 3];
+const NIVEAU_SSI = { 1: 'RDC', 3: 'R+1' };
 
 /* Points de contrôle : [référence, famille, libellé, fréquence]
    fréquence : 'o' = une fois par ronde · 'l' = à chaque niveau de l'entrée */
@@ -55,8 +58,8 @@ const RAPPEL = { heure: 8, minute: 30, jours: [1, 2, 3, 4, 5] };   // 1 = lundi 
 
 /* Les trois rondes, choisies séparément depuis l'accueil. */
 const RONDES = {
-  e1: { nom: 'Entrée n°1', parcours: 'Hall, RDC à R+18, centrale SSI' },
-  e3: { nom: 'Entrée n°3', parcours: 'Hall, RDC à R+18, centrale SSI' },
+  e1: { nom: 'Entrée n°1', parcours: 'R+18 à RDC (centrale SSI au RDC), puis hall' },
+  e3: { nom: 'Entrée n°3', parcours: 'R+18 à RDC (centrale SSI au R+1), puis hall' },
   g:  { nom: 'Général',    parcours: 'Extérieur, toiture-terrasse' },
 };
 
@@ -76,9 +79,12 @@ function station(id, titre, sous, ent, ronde, pts, court) {
 const STATIONS = [];
 ENTREES.forEach(e => {
   const ronde = 'e' + e, ent = 'n°' + e;
+  NIVEAUX.forEach(n => {
+    const ssi = NIVEAU_SSI[e] === n;
+    STATIONS.push(station(ronde + '-' + n, n, 'Escalier, paliers, placards' + (ssi ? ', centrale SSI' : ''), ent, ronde,
+      ssi ? parNiveau.concat(famille('Centrale de désenfumage')) : parNiveau));
+  });
   STATIONS.push(station(ronde + '-hall', 'Hall', 'Rez-de-chaussée et demi-niveau', ent, ronde, famille('Hall')));
-  NIVEAUX.forEach(n => STATIONS.push(station(ronde + '-' + n, n, 'Escalier, paliers, placards', ent, ronde, parNiveau)));
-  STATIONS.push(station(ronde + '-centrale', 'Centrale de désenfumage', 'SSI', ent, ronde, famille('Centrale de désenfumage'), 'SSI'));
 });
 STATIONS.push(station('ext', 'Extérieur', 'Voie, portail, locaux', '', 'g', famille('Extérieur'), 'Ext.'));
 STATIONS.push(station('toit', 'Toiture-terrasse', 'Accès, cheminements, garde-corps', '', 'g', famille('Toiture-terrasse'), 'Toit'));
