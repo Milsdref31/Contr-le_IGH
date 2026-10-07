@@ -1,6 +1,6 @@
 # Contrôle IGH — Ronde de sécurité « LA TOUR »
 
-Application de ronde hebdomadaire de sécurité de l'IGH « LA TOUR » :
+Application de ronde hebdomadaire de sécurité d'un IGH :
 Conforme / Non conforme pour chaque point, fiche anomalie avec photo, clôture bloquée tant qu'il manque un contrôle,
 historique, suivi des anomalies, export PDF et CSV.
 
@@ -16,7 +16,7 @@ Fichiers : `AAAA-MM-JJ_Ronde_LA-TOUR_Entree-1.pdf` (ou `Entree-3`, `General`).
 
 Une seule base de code, deux façons de l'utiliser :
 
-| | Appli web (Netlify) | APK Android |
+|  | APK Android |
 |---|---|---|
 | Source | dossier `www/` | `www/` emballé par Capacitor (`android/`) |
 | Installation | « Ajouter à l'écran d'accueil » | fichier `.apk` depuis l'onglet **Releases** |
