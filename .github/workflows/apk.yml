@@ -1,0 +1,77 @@
+# Construit l'APK Android à chaque envoi sur main (ou à la demande : onglet Actions > Run workflow)
+# et le publie dans l'onglet « Releases » du dépôt, téléchargeable depuis le téléphone.
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # nécessaire pour créer la Release
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Dépendances + copie de www/ dans le projet Android
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: Clé de signature (secrets du dépôt)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "SUFFIXE=" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Secrets de signature absents : APK de TEST (clé jetable). Voir README, section Signature."
+            echo "SUFFIXE=-TEST" >> "$GITHUB_ENV"
+          fi
+
+      - name: Compilation de l'APK
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk "../dist/Controle-IGH-v1.0.${VERSION_CODE}${SUFFIXE}.apk"
+
+      - name: Vérification de la signature
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs dist/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: dist/*.apk
+
+      - name: Publication dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}${SUFFIXE}"
+          gh release create "$TAG" dist/*.apk \
+            --title "Contrôle IGH $TAG" \
+            --notes "APK construit depuis ${GITHUB_SHA::7}. Sur le téléphone : télécharger le .apk puis l'ouvrir pour l'installer."
