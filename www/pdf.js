@@ -16,7 +16,7 @@ d.setFont('helvetica','normal');d.setFontSize(11);d.text((H.label?H.label+'  -  
 if(H.logo){try{const ip=d.getImageProperties(H.logo),sc=Math.min(26/ip.width,26/ip.height),w=ip.width*sc,h=ip.height*sc,x=W-Mx-w,y0=(30-h)/2;
  d.addImage(H.logo,ip.fileType||'PNG',x,y0,w,h)}catch(e){}}
 y=40;
-wrap('Contrôleur : '+r.agent,10,false,INK,Mx,CW,5);
+wrap('Agent : '+r.agent,10,false,INK,Mx,CW,5);
 wrap('Début : '+H.ft(r.debut)+'   Fin : '+(r.fin?H.ft(r.fin)+'   Durée : '+H.dur(r):'en cours'),10,false,INK,Mx,CW,5);
 wrap('Bâtiment : '+BATIMENT,10,false,INK,Mx,CW,5);
 if(r.incomplete){y+=2;wrap('RONDE CLÔTURÉE INCOMPLÈTE - '+cnt(r).rest+' point(s) sans réponse. Motif : '+r.motif,10,true,KO,Mx,CW,5)}
@@ -41,7 +41,8 @@ nc.forEach(({s,p,x})=>{ensure(30);
  wrap(p.id+' - '+p.lib,10,true,KO,Mx+3,CW-3,4.8);
  wrap(s.titre+'  |  Lieu : '+x.lieu+(x.ent?'  |  Entrée '+x.ent:'')+'  |  '+H.ft(x.t),9,false,MUT,Mx+3,CW-3,4.4);
  wrap('Observation : '+x.com,9.5,false,INK,Mx+3,CW-3,4.6);
- {const h=(x.hist||[]).slice(-1)[0];wrap('Suivi : '+(x.suivi||'À traiter')+(h?' (depuis le '+H.fd(h.t)+' '+H.ft(h.t)+')':''),9,true,INK,Mx+3,CW-3,4.6)}
+ {const h=(x.hist||[]).slice(-1)[0];wrap('Suivi : '+(x.suivi||'À traiter')+(h?' (depuis le '+H.fd(h.t)+' '+H.ft(h.t)+')':'')+(x.archive?' - archivée le '+H.fd(x.archive.t):''),9,true,INK,Mx+3,CW-3,4.6)}
+ (x.coms||[]).forEach(cm=>wrap('Commentaire du '+H.fd(cm.t)+' '+H.ft(cm.t)+' ('+cm.auteur+') : '+cm.txt,8.5,false,MUT,Mx+3,CW-3,4.2));
  if(x.ph){try{const ip=d.getImageProperties(x.ph),sc=Math.min(70/ip.width,60/ip.height),w=ip.width*sc,h=ip.height*sc;ensure(h+3);d.addImage(x.ph,'JPEG',Mx+3,y,w,h);y+=h+2}catch(e){}}
  d.rect(Mx,y0,1.2,y-y0,'F');y+=5});
 
@@ -61,6 +62,11 @@ Object.keys(PARTS).forEach(k=>{
    else{font(7.5,true,KO);d.text('NON CONFORME',Mx+135,y);font(7.5,false,MUT);d.text(H.ft(x.t),Mx+165,y)}
    y+=h;d.setDrawColor(...LINE);d.setLineWidth(.15);d.line(Mx,y-2.8,Mx+CW,y-2.8)});
   y+=1.5})});
+
+/* Signature de l'agent (fin du rapport) */
+if(r.signature){ensure(52);y+=6;font(11,true,PRI);d.text('SIGNATURE DE L\'AGENT',Mx,y);y+=2;d.setDrawColor(...PRI);d.setLineWidth(.5);d.line(Mx,y,Mx+CW,y);y+=6;
+ wrap(r.signature.nom+' - signé le '+H.fd(r.signature.t)+' à '+H.ft(r.signature.t),9.5,false,INK,Mx,CW,5);
+ try{const ip=d.getImageProperties(r.signature.img),sc=Math.min(80/ip.width,32/ip.height),w=ip.width*sc,h=ip.height*sc;d.setDrawColor(...LINE);d.setLineWidth(.3);d.rect(Mx,y,w+4,h+4);d.addImage(r.signature.img,'PNG',Mx+2,y+2,w,h);y+=h+6}catch(e){}}
 
 /* Pied de page */
 const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);font(8,false,MUT);d.text('Ronde '+S(BATIMENT)+(H.label?' - '+H.label:'')+' - '+H.fd(r.debut)+' - page '+i+'/'+n,Mx,291)}

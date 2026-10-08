@@ -180,3 +180,23 @@ summary{font-weight:600;cursor:pointer}
 .err{border-color:var(--alarm)!important}
 
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
+
+/* ===== Paramètres, mise à jour ===== */
+.hero .grow{flex:1}
+.gear{background:none;border:1px solid color-mix(in srgb,var(--on-bar) 35%,transparent);color:var(--on-bar);border-radius:10px;font-size:24px;width:48px;height:48px}
+.majbox{display:block;width:100%;text-align:left;border-color:var(--safe);background:var(--safe-bg);color:var(--ink)}
+.agentline{margin:10px 0 0}
+.lk{background:none;border:0;color:var(--pri);text-decoration:underline;padding:6px 0;font-size:15px}
+.box p:first-child{margin-top:0}
+
+/* ===== Signature ===== */
+.sig{display:block;width:100%;height:190px;border:2px dashed var(--line);border-radius:10px;background:#fff;touch-action:none;margin-top:10px}
+.sigbox img{display:block;max-width:100%;height:110px;object-fit:contain;background:#fff;border-radius:6px;margin-top:8px}
+
+/* ===== Commentaires et archivage des anomalies ===== */
+.ano.arch{border-left-color:var(--idle);opacity:.85}
+.coms{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.coms ul{list-style:none;padding:0;margin:8px 0}
+.coms li{border-top:1px solid var(--line);padding:6px 0}
+.addc textarea{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;margin-top:6px}
+.addc .btn{padding:10px;margin:6px 0 0}

@@ -38,7 +38,10 @@
 
     <!-- Permissions -->
 
+    <!-- Réseau : uniquement pour rechercher et télécharger une mise à jour (GitHub Releases) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Installer la mise à jour téléchargée (l'utilisateur confirme dans l'installateur Android) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android 7 à 10 uniquement : enregistrer PDF / CSV dans Documents/Contrôle IGH -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />

@@ -3,7 +3,8 @@
    Dans l'APK, il remplace ce que la vue web Android ne sait pas faire :
    - enregistrer un fichier (PDF / CSV) dans Documents/Contrôle IGH/AAAA-MM-JJ/
    - ouvrir le menu de partage Android (mail, Teams, Drive…)
-   - gérer le bouton « retour » du téléphone                                   */
+   - gérer le bouton « retour » du téléphone
+   - programmer les rappels, installer une mise à jour                         */
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = (() => {
   if (!NATIVE) return null;
@@ -59,22 +60,38 @@ const Native = (() => {
     throw derniere;
   }
 
-  /* Enregistre puis propose le partage. sousDossier = date AAAA-MM-JJ de la ronde. */
-  async function saveAndShare(blob, nom, sousDossier) {
-    let res;
+  /* Enregistre un ou plusieurs fichiers puis ouvre le menu de partage avec tous les fichiers
+     (ex. CSV + photos : la messagerie les joint tous au même mail).
+     fichiers = [{ nom, blob } ou { nom, base64 }] ; sousDossier = ex. date AAAA-MM-JJ de la ronde. */
+  async function saveAndShareMany(fichiers, sousDossier, titre, partager = true) {
+    const uris = [];
+    let lieu = null;
     try {
-      res = await write(await toBase64(blob), sousDossier, nom);
+      for (const f of fichiers) {
+        const res = await write(f.base64 || await toBase64(f.blob), sousDossier, f.nom);
+        uris.push(res.uri);
+        lieu = lieu || res.lieu;
+      }
     } catch (e) {
       alert('Impossible d’enregistrer le fichier : ' + (e && e.message || e));
       return;
     }
-    if (res.lieu) toast('Enregistré dans ' + res.lieu);
+    if (lieu) toast((uris.length > 1 ? uris.length + ' fichiers enregistrés' : 'Enregistré') + ' dans ' + lieu);
+    if (!partager) return lieu;
     try {
-      await Share.share({ title: nom, files: [res.uri], dialogTitle: 'Envoyer ' + nom });
+      await Share.share({ title: titre, files: uris, dialogTitle: 'Envoyer ' + titre });
     } catch (e) {
-      /* Partage annulé par l'utilisateur : rien à faire, le fichier est déjà enregistré. */
+      /* Partage annulé par l'utilisateur : rien à faire, les fichiers sont déjà enregistrés. */
     }
   }
+  const saveAndShare = (blob, nom, sousDossier) => saveAndShareMany([{ nom, blob }], sousDossier, nom);
+
+  /* Version installée : { version: '1.0.12', build: '12' } */
+  const appInfo = () => App.getInfo();
+
+  /* Mise à jour (plugin propre à l'application, voir android/.../UpdaterPlugin.java).
+     Absent des versions antérieures : on renvoie null au lieu de bloquer. */
+  const Updater = (Capacitor.Plugins && Capacitor.Plugins.Updater) || null;
 
   /* Bouton retour Android : délégué à window.onBack() défini dans index.html.
      onBack() renvoie false quand on est sur l'accueil → l'appli se ferme. */
@@ -111,7 +128,7 @@ const Native = (() => {
     }
   }
 
-  return { saveAndShare, toast, planReminders };
+  return { saveAndShare, saveAndShareMany, toast, planReminders, appInfo, Updater };
   } catch (e) {
     /* Ne jamais bloquer l'appli : sans pont natif, les exports affichent un message clair. */
     console.error('Pont natif indisponible', e);

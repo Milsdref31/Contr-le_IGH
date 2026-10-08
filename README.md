@@ -24,13 +24,16 @@ Ce document comporte deux parties :
 | Trois rondes séparées | **Entrée n°1**, **Entrée n°3** et **Général**, choisies depuis l'accueil. Chacune se démarre, se clôture et s'exporte indépendamment. |
 | Saisie rapide | Deux gros boutons par point : **✓ Conforme** / **✕ Non conforme**. Le bouton « Tout mettre conforme » valide d'un coup les points restants d'un niveau. |
 | Fiche anomalie | En cas de non-conformité : lieu et entrée pré-remplis, observation obligatoire, photo facultative. |
+| Signature électronique | Chaque ronde est signée au doigt par l'agent au moment de la clôture ; la signature figure à la fin du rapport PDF. |
 | Traçabilité | Chaque réponse est horodatée. Le rapport indique le nom de l'agent, l'heure de début, de fin et la durée. |
 | Clôture contrôlée | Une ronde ne se clôture normalement que si tous les points ont une réponse (voir [Règles](#règles-de-traçabilité)). |
-| Rapports | Rapport **PDF** (synthèse, anomalies avec photos, détail de tous les points) et export **CSV** pour Excel. |
-| Suivi des anomalies | Statut *À traiter* → *En cours* → *Levée*, avec la date de chaque changement. |
+| Rapports | Rapport **PDF** (synthèse, anomalies avec photos et commentaires, détail de tous les points, signature) et export **CSV** pour Excel, envoyé avec les photos des anomalies. |
+| Suivi des anomalies | Statut *À traiter* → *En cours* → *Levée* (date de chaque changement), commentaires de suivi datés, archivage des anomalies levées. |
 | Rappels | Notification du lundi au vendredi vers 8 h 30 tant que les 3 rondes de la semaine ne sont pas faites. |
 | Enregistrement automatique | Tout est enregistré en continu. Si l'application est fermée, elle rouvre exactement là où l'on s'était arrêté. |
 | Hors ligne | Aucun réseau nécessaire pendant la ronde. |
+| Sauvegarde | Un fichier de sauvegarde unique (rondes, anomalies, photos, signatures) à créer et à restaurer depuis les Paramètres. |
+| Mise à jour | Recherche et installation de la nouvelle version depuis l'application (Paramètres). |
 
 ### Parcours des rondes (configuration actuelle)
 
@@ -58,11 +61,13 @@ Configuration requise : Android 7.0 ou plus récent.
 
 ### Faire une ronde
 
-1. **Accueil** : saisir son nom (« Contrôleur »), puis appuyer sur la ronde à faire.
+1. **Première utilisation** : ouvrir les **Paramètres** (roue ⚙ en haut de l'accueil) et saisir son nom.
+   **Accueil** : appuyer sur la ronde à faire.
 2. **Parcours** : la liste des niveaux s'affiche. Le bouton vert « Continuer » ouvre le prochain niveau à contrôler.
 3. **Niveau** : répondre à chaque point. En cas d'anomalie, remplir la fiche (observation, photo).
    Le bouton du bas passe au niveau suivant.
-4. **Terminer la ronde** : vérifier le récapitulatif puis appuyer sur « Clôturer la ronde ».
+4. **Terminer la ronde** : vérifier le récapitulatif, appuyer sur « Clôturer la ronde », **signer au doigt**
+   dans le cadre puis appuyer sur « Signer et clôturer ».
 5. **Rapport** : le rapport s'affiche. « Exporter le rapport PDF » l'enregistre sur le téléphone et ouvre
    le menu de partage (messagerie, Teams…) pour l'envoyer au mandataire.
 
@@ -74,6 +79,31 @@ Une ronde interrompue reste « En cours » sur l'accueil : il suffit d'appuyer d
 - Sur le téléphone : dossier `Documents/Contrôle IGH/AAAA-MM-JJ/`
 - Nom des fichiers : `AAAA-MM-JJ_Ronde_<bâtiment>_Entree-1.pdf` (ou `Entree-3`, `General`, et `.csv`).
   Le format année-mois-jour permet un classement chronologique automatique.
+- **Export CSV et photos** : « Exporter le détail en CSV » joint au même envoi (mail, Teams…) le fichier CSV **et les
+  photos des anomalies**. Chaque photo est renommée `date_entrée_étage_équipement.jpg`
+  (ex. `2026-10-07_Entree-1_R+12_Portes-coupe-feu-4.1.jpg`) et ce nom figure dans la colonne « Fichier photo » du CSV.
+
+### Suivi des anomalies
+
+- Écran **Anomalies** (accueil) : filtres *Ouvertes*, *Levées*, *Archivées*, *Toutes*, et par ronde.
+- Statut en un appui : *À traiter* → *En cours* → *Levée*. Chaque changement est daté.
+- **Commentaires de suivi** : sous chaque anomalie, ajouter un commentaire (devis demandé, intervention prévue…).
+  Il est enregistré avec la date, l'heure et le nom de l'agent, puis repris dans le PDF et le CSV.
+- **Archivage** : une anomalie *Levée* peut être archivée ; elle quitte les listes courantes et reste consultable
+  dans le filtre *Archivées* (désarchivage possible).
+
+### Paramètres
+
+- **Nom de l'agent** : enregistré sur chaque ronde, dans les rapports et avec la signature.
+- **Créer une sauvegarde** : un fichier `AAAA-MM-JJ_Sauvegarde_Controle-IGH.json` contenant toutes les données
+  (rondes, anomalies, photos, signatures), enregistré dans `Documents/Contrôle IGH/Sauvegardes/` et proposé au partage.
+  À conserver hors du téléphone (messagerie, OneDrive…).
+- **Restaurer une sauvegarde** : choisir le fichier ; après confirmation, il **remplace** les données de l'application
+  (changement de téléphone, réinstallation).
+- **Mise à jour** : « Rechercher une mise à jour » compare la version installée à la dernière version publiée ;
+  « Installer la mise à jour » crée d'abord une sauvegarde, télécharge la nouvelle version puis ouvre l'installateur
+  Android (confirmation demandée). La première fois, Android demande d'autoriser l'application à installer des mises à jour.
+  Une mise à jour disponible est aussi signalée sur l'accueil (vérification une fois par jour).
 
 ### Règles de traçabilité
 
@@ -83,8 +113,9 @@ Une ronde interrompue reste « En cours » sur l'accueil : il suffit d'appuyer d
 - Clôture normale : uniquement quand tous les points ont une réponse.
 - Clôture anticipée (« Clôturer quand même ») : un **motif est obligatoire** ; la ronde est marquée
   **« incomplète »** à l'écran et dans le PDF, et les points sans réponse y figurent comme « MANQUANT ».
-- Une ronde clôturée n'est plus modifiable. Seul le statut de suivi des anomalies peut évoluer, et chaque
-  changement est daté.
+- La clôture exige la **signature électronique** de l'agent (tracé au doigt), enregistrée avec son nom, la date et l'heure.
+- Une ronde clôturée n'est plus modifiable. Seuls le suivi des anomalies (statut, commentaires, archivage) peut évoluer,
+  et chaque action est datée.
 - Une ronde en cours peut être supprimée (double confirmation) ; une ronde clôturée ne peut pas l'être.
 
 ### Rappels hebdomadaires
@@ -119,17 +150,24 @@ Une ronde interrompue reste « En cours » sur l'accueil : il suffit d'appuyer d
 │           Share        menu de partage       │
 │           App          bouton retour         │
 │           LocalNotifications  rappels        │
+│           Updater (propre à l'appli) mise à jour
 │                                              │
 │  Stockage : localStorage de la WebView       │
 └──────────────────────────────────────────────┘
-        Aucun serveur, aucun appel réseau.
+  Aucun serveur. Seul appel réseau : la recherche et le
+  téléchargement d'une mise à jour (GitHub Releases).
 ```
 
 - **Interface** : application web statique (HTML/CSS/JavaScript, sans framework ni étape de compilation),
   embarquée dans un APK par [Capacitor](https://capacitorjs.com/).
 - **PDF** : généré sur le téléphone par la bibliothèque jsPDF.
 - **Données** : objet JSON dans le `localStorage` de la WebView (clé `ronde_latour_v3`), enregistré à chaque action.
-- **Réseau** : aucun. L'application fonctionne entièrement hors ligne.
+- **Réseau** : la ronde fonctionne entièrement hors ligne. Le seul échange réseau est la mise à jour : lecture de la
+  dernière version publiée (`api.github.com`, dépôt réglé dans `catalogue.js`, `MISE_A_JOUR`) puis téléchargement de l'APK.
+  Aucune donnée de ronde n'est envoyée.
+- **Mise à jour** : plugin Android propre à l'application, `UpdaterPlugin.java` (téléchargement dans le cache puis
+  ouverture de l'installateur Android, qui demande confirmation). Le numéro de version de l'APK (`versionCode`) est le
+  numéro de compilation ; une version est proposée si le numéro de la dernière release est supérieur.
 
 ### Arborescence
 
@@ -138,13 +176,14 @@ www/                        application (seul dossier à modifier pour le foncti
   catalogue.js              ► nom du bâtiment, points de contrôle, niveaux, ordre des rondes, niveau de la SSI, heure des rappels
   app.js                    écrans, actions, enregistrement, exports CSV, calcul des rappels
   pdf.js                    mise en page du rapport PDF
-  native.js                 liaison avec Android (fichiers, partage, retour, notifications)
+  native.js                 liaison avec Android (fichiers, partage, retour, notifications, mise à jour)
   style.css                 mise en forme
   index.html                page unique, ordre de chargement des scripts
   jspdf.umd.min.js          bibliothèque jsPDF 4.2.1 (MIT)
   fonts/                    police Barlow (licence OFL) embarquée
   icon.svg, logo.png        logo (en-tête de l'accueil, en-tête du PDF)
 android/                    projet Android (manifeste, icônes, signature) — généré par Capacitor
+  app/src/main/java/…/UpdaterPlugin.java   plugin de mise à jour depuis l'application
 tools/make_logo.py          dessine le logo et régénère toutes les icônes
 tools/BarlowCondensed-Bold.ttf, tools/OFL-Barlow.txt   police utilisée par make_logo.py
 .github/workflows/apk.yml   compilation automatique de l'APK
@@ -168,11 +207,12 @@ package.json                dépendances (versions figées)
 | Sujet | Situation |
 |---|---|
 | Hébergement des données | **Uniquement sur le téléphone de l'agent** (`localStorage` de la WebView, espace privé de l'application, inaccessible aux autres applications). |
-| Données personnelles | Nom de l'agent saisi, horodatages, photos d'anomalies. Aucune donnée transmise automatiquement. |
-| Accès par un tiers | **Uniquement si l'agent partage le rapport en PDF ou en CSV**, par le menu de partage Android. Il n'existe aucun autre moyen de consulter les données. |
-| Réseau | Aucun appel réseau. La permission `INTERNET` est présente par défaut dans le modèle Capacitor, sans usage. |
-| Permissions Android | `POST_NOTIFICATIONS` (rappels) · `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` (rappels conservés après redémarrage) · `READ/WRITE_EXTERNAL_STORAGE` limitées à Android ≤ 10 (écriture dans `Documents`). |
-| Sauvegarde | Aucune sauvegarde centrale. Les PDF exportés constituent la trace officielle. |
+| Données personnelles | Nom de l'agent, horodatages, photos d'anomalies, signature manuscrite (image), commentaires. Aucune donnée transmise automatiquement. |
+| Accès par un tiers | **Uniquement si l'agent partage le rapport en PDF ou en CSV** (ou un fichier de sauvegarde), par le menu de partage Android. Il n'existe aucun autre moyen de consulter les données. |
+| Réseau | Uniquement pour la mise à jour (`api.github.com` et téléchargement de l'APK). Aucune donnée de ronde n'est transmise. |
+| Permissions Android | `POST_NOTIFICATIONS` (rappels) · `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` (rappels conservés après redémarrage) · `INTERNET` (mise à jour) · `REQUEST_INSTALL_PACKAGES` (installation de la mise à jour, confirmée par l'utilisateur) · `READ/WRITE_EXTERNAL_STORAGE` limitées à Android ≤ 10 (écriture dans `Documents`). |
+| Sauvegarde | Fichier de sauvegarde créé à la demande par l'agent (Paramètres). Il contient toutes les données, photos et signatures comprises : à stocker sur un espace professionnel. Aucune sauvegarde centrale automatique ; les PDF exportés constituent la trace officielle. |
+| Signature électronique | Image du tracé manuscrit, associée au nom de l'agent et à l'horodatage. Il s'agit d'une signature simple (pas de certificat qualifié au sens eIDAS). |
 | Code source | Dépôt public : il ne contient aucune donnée de ronde, aucun mot de passe ni aucune clé. |
 
 ### Compilation de l'APK
@@ -221,6 +261,7 @@ signée avec **la même clé**. La clé est fournie au workflow par quatre secre
 | Ajouter, retirer, renommer un point de contrôle | `www/catalogue.js`, tableau `POINTS` (fréquence `o` = une fois par ronde, `l` = à chaque niveau) |
 | Changer l'ordre ou la liste des niveaux | `www/catalogue.js`, `NIVEAUX` |
 | Changer le niveau de la centrale SSI | `www/catalogue.js`, `NIVEAU_SSI = { 1: 'RDC', 3: 'R+1' }` |
+| Changer le dépôt utilisé pour les mises à jour | `www/catalogue.js`, `MISE_A_JOUR = { depot: 'propriétaire/dépôt' }` |
 | Changer l'heure ou les jours des rappels | `www/catalogue.js`, `RAPPEL = { heure: 8, minute: 30, jours: [1, 2, 3, 4, 5] }` |
 | Modifier le rapport PDF | `www/pdf.js` |
 | Modifier le logo ou les icônes | `tools/make_logo.py`, puis `python3 tools/make_logo.py` (Pillow et fontTools requis) |
@@ -236,7 +277,7 @@ Après modification : envoyer sur `main`, attendre la compilation, installer le 
 Pour contrôler une modification sans compiler l'APK, servir le dossier `www/` en local
 (par exemple `python3 -m http.server` dans `www/`) et l'ouvrir dans un navigateur d'ordinateur.
 Toutes les fonctions sont utilisables, sauf celles propres à Android : enregistrement dans `Documents`,
-menu de partage (remplacé par un téléchargement), bouton retour et notifications.
+menu de partage (remplacé par des téléchargements), bouton retour, notifications et installation de mise à jour.
 
 ### Limites connues
 
@@ -244,3 +285,8 @@ menu de partage (remplacé par un téléchargement), bouton retour et notificati
   consultable par un tiers uniquement via les PDF / CSV partagés par l'agent.
   Une évolution vers un stockage central (SharePoint / Microsoft Lists, serveur interne) est possible si le besoin apparaît.
 - Les rappels sont « vers 8 h 30 » : Android peut décaler légèrement une alarme non exacte pour économiser la batterie.
+- La mise à jour depuis l'application suppose : un dépôt **public** (ou une adaptation pour un dépôt privé),
+  et des APK **signés avec la même clé** (voir Signature). Avec les versions `-TEST`, Android refuse l'installation
+  par-dessus : il faut alors sauvegarder, désinstaller, installer puis restaurer la sauvegarde.
+- Le stockage interne de la WebView est limité (quelques Mo) : les photos pèsent environ 100 Ko chacune.
+  Créer régulièrement une sauvegarde.

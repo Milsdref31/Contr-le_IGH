@@ -65,6 +65,7 @@ function anomalies() {
     .map(p => ({ r, s, p, x: r.r[p.k] }))));
 }
 const ouverte = a => a.x.suivi !== 'Levée';
+const archivee = a => !!a.x.archive;
 
 /* ---------- Contrôles de la semaine (lundi 00:00 à dimanche 23:59) ---------- */
 function lundi(d) {
@@ -105,6 +106,16 @@ function natifIndispo() {
 const SLUG = { e1: 'Entree-1', e3: 'Entree-3', g: 'General' };
 const day = r => { const t = new Date(r.debut); return t.getFullYear() + '-' + p2(t.getMonth() + 1) + '-' + p2(t.getDate()); };
 const fname = r => day(r) + '_Ronde_' + BATIMENT.trim().replace(/\s+/g, '-') + '_' + SLUG[r.type];
+/* Texte utilisable dans un nom de fichier : sans accent ni espace (ex. « Portes coupe-feu » -> « Portes-coupe-feu »). */
+const slug = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9+]+/g, '-').replace(/^-+|-+$/g, '');
+const jour = iso => { const t = new Date(iso); return t.getFullYear() + '-' + p2(t.getMonth() + 1) + '-' + p2(t.getDate()); };
+/* Nom d'une photo d'anomalie : date_entrée_étage_équipement.jpg
+   ex. 2026-10-07_Entree-1_R+12_Portes-coupe-feu-4.1.jpg (pour la ronde Général, l'« étage » est la zone). */
+function nomPhoto(r, s, p, x) {
+  const etage = r.type === 'g' ? slug(s.titre) : slug(s.court);
+  return jour(x.t) + '_' + SLUG[r.type] + '_' + etage + '_' + slug(p.fam) + '-' + p.id + '.jpg';
+}
+const texteComs = x => (x.coms || []).map(c => fd(c.t) + ' ' + ft(c.t) + ' ' + c.auteur + ' : ' + c.txt).join(' | ');
 
 /* Logo facultatif du PDF : déposer un fichier logo.png à côté de index.html */
 let LOGO = null;
@@ -124,29 +135,109 @@ async function exportPDF(r) {
   doc.save(name);   // hors APK (test sur ordinateur) : simple téléchargement
 }
 
+/* Export CSV : une ligne par point. Les photos d'anomalies sont jointes au même envoi,
+   renommées date_entrée_étage_équipement.jpg ; la colonne « Fichier photo » donne ce nom. */
 async function exportCSV(r) {
-  const L = [['Date', 'Heure', 'Contrôleur', 'Bâtiment', 'Ronde', 'Entrée', 'Niveau / zone', 'Point', 'Famille', 'Libellé',
-    'Résultat', 'Lieu anomalie', 'Observation', 'Photo', 'Suivi', 'Mode']];
+  const L = [['Date', 'Heure', 'Agent', 'Bâtiment', 'Ronde', 'Entrée', 'Niveau / zone', 'Point', 'Famille', 'Libellé',
+    'Résultat', 'Lieu anomalie', 'Observation', 'Fichier photo', 'Suivi', 'Commentaires de suivi', 'Archivée le', 'Mode']];
+  const photos = [];
   stationsDe(r).forEach(s => s.pts.forEach(p => {
     const x = r.r[p.k];
+    let fichier = '';
+    if (x && x.ph) { fichier = nomPhoto(r, s, p, x); photos.push({ nom: fichier, base64: x.ph.split(',')[1], dataUrl: x.ph }); }
     L.push([x ? fd(x.t) : '', x ? ft(x.t) : '', r.agent, BATIMENT, RONDES[r.type].nom, s.ent || (x && x.ent) || '', s.titre,
       p.id, p.fam, p.lib, x ? (x.v === 'C' ? 'Conforme' : 'Non conforme') : 'MANQUANT',
-      (x && x.lieu) || '', (x && x.com) || '', x && x.ph ? 'oui' : '', (x && x.suivi) || '',
-      x ? (x.bloc ? 'en bloc' : 'unitaire') : '']);
+      (x && x.lieu) || '', (x && x.com) || '', fichier, (x && x.suivi) || '', x ? texteComs(x) : '',
+      x && x.archive ? fd(x.archive.t) : '', x ? (x.bloc ? 'en bloc' : 'unitaire') : '']);
   }));
-  const txt = '﻿' + L.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
+  const txt = '\ufeff' + L.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
   const b = new Blob([txt], { type: 'text/csv' });
-  if (NATIVE) return Native ? Native.saveAndShare(b, fname(r) + '.csv', day(r)) : natifIndispo();
-  const a = document.createElement('a');   // hors APK (test sur ordinateur) : simple téléchargement
-  a.href = URL.createObjectURL(b);
-  a.download = fname(r) + '.csv';
-  a.click();
+  const nomCsv = fname(r) + '.csv';
+  if (NATIVE) {
+    if (!Native) return natifIndispo();
+    return Native.saveAndShareMany([{ nom: nomCsv, blob: b }, ...photos], day(r),
+      photos.length ? nomCsv + ' + ' + plural(photos.length, 'photo') : nomCsv);
+  }
+  telecharger(URL.createObjectURL(b), nomCsv);   // hors APK (test sur ordinateur) : téléchargements
+  photos.forEach(f => telecharger(f.dataUrl, f.nom));
+}
+function telecharger(href, nom) {
+  const a = document.createElement('a');
+  a.href = href; a.download = nom; a.click();
+}
+
+/* ---------- Sauvegarde / restauration de toutes les données ---------- */
+function sauvegarde() {
+  return JSON.stringify({ app: 'controle-igh', format: 1, creee: now(), batiment: BATIMENT, data: { ...DB, ui: null } });
+}
+const nomSauvegarde = () => jour(now()) + '_Sauvegarde_Controle-IGH.json';
+async function exporterSauvegarde(partager = true) {
+  const b = new Blob([sauvegarde()], { type: 'application/json' }), nom = nomSauvegarde();
+  if (NATIVE) return Native ? Native.saveAndShareMany([{ nom, blob: b }], 'Sauvegardes', nom, partager) : natifIndispo();
+  telecharger(URL.createObjectURL(b), nom);
+}
+function restaurer(texte) {
+  let o;
+  try { o = JSON.parse(texte); } catch (e) { alert('Fichier illisible : ce n’est pas une sauvegarde de l’application.'); return; }
+  if (!o || o.app !== 'controle-igh' || !o.data || !Array.isArray(o.data.rondes)) {
+    alert('Ce fichier n’est pas une sauvegarde de l’application Contrôle IGH.'); return;
+  }
+  const n = o.data.rondes.length;
+  if (!confirm('Restaurer la sauvegarde du ' + fd(o.creee) + ' à ' + ft(o.creee) + ' (' + plural(n, 'ronde') + ') ?\n\n'
+    + 'Les données actuelles de l’application seront REMPLACÉES.')) return;
+  try { localStorage.setItem(KEY + '_avant_restauration', JSON.stringify(DB)); } catch (e) { /* place insuffisante : on continue */ }
+  DB = o.data;
+  DB.ui = null;
+  save();
+  V = { s: 'home' }; M = null; render(); majRappels();
+  alert('Sauvegarde restaurée : ' + plural(n, 'ronde') + '.');
+}
+
+/* ---------- Mise à jour depuis l'application (APK) ---------- */
+let MAJ = null;   // résultat de la dernière recherche : { installe, derniere, dispo }
+async function chercherMaj() {
+  const info = NATIVE && Native ? await Native.appInfo() : { version: 'navigateur', build: '0' };
+  const rep = await fetch('https://api.github.com/repos/' + MISE_A_JOUR.depot + '/releases/latest',
+    { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+  if (!rep.ok) throw new Error('serveur de mise à jour injoignable (HTTP ' + rep.status + ')');
+  const rel = await rep.json(), m = /v\d+\.\d+\.(\d+)/.exec(rel.tag_name || ''), apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+  const derniere = { tag: rel.tag_name, build: m ? +m[1] : 0, url: apk && apk.browser_download_url, test: /-TEST/i.test(rel.tag_name || ''), date: rel.published_at };
+  MAJ = { installe: info, derniere, dispo: !!(derniere.url && derniere.build > +info.build) };
+  return MAJ;
+}
+async function installerMaj() {
+  if (!(MAJ && MAJ.dispo)) return;
+  if (!(NATIVE && Native && Native.Updater)) { alert('La mise à jour se fait depuis l’application installée sur le téléphone.'); return; }
+  if (MAJ.derniere.test && !confirm('Cette version est une version de TEST, signée avec une clé différente : Android risque de refuser '
+    + 'de l’installer par-dessus. Dans ce cas, il faudra désinstaller puis réinstaller (après restauration de la sauvegarde).\n\nContinuer ?')) return;
+  const ok = (await Native.Updater.canInstall()).allowed;
+  if (!ok) {
+    alert('Android doit autoriser cette application à installer des mises à jour.\n\nActivez « Autoriser cette source » dans l’écran qui va s’ouvrir, '
+      + 'revenez dans l’application puis appuyez à nouveau sur « Installer ».');
+    await Native.Updater.openInstallSettings();
+    return;
+  }
+  await exporterSauvegarde(false);   // sauvegarde de sécurité avant la mise à jour (Documents/Contrôle IGH/Sauvegardes)
+  Native.toast('Téléchargement de la version ' + MAJ.derniere.tag + '…');
+  try { await Native.Updater.downloadAndInstall({ url: MAJ.derniere.url }); }
+  catch (e) { alert((e && e.message) || String(e)); }
+}
+/* Recherche discrète au démarrage (une fois par jour, sans message en cas d'échec). */
+function majAuDemarrage() {
+  if (!(NATIVE && Native)) return;
+  const auj = jour(now());
+  if (DB.majVerif === auj) return;
+  chercherMaj().then(() => {
+    DB.majVerif = auj; save();
+    if (MAJ.dispo && V.s === 'home' && !M) render(true);
+  }).catch(() => {});
 }
 
 /* ---------- Navigation ----------
    V = écran courant, M = fenêtre ouverte (anomalie, clôture, photo), F = filtres */
 let V = { s: 'home' }, M = null;
 const F = { hist: 'all', anomStatut: 'open', anomRonde: 'all' };
+const SIG = { traits: 0 };   // signature en cours de tracé
 
 const topBar = (back, titre, sous, extra) => `<div class="top">
   ${back ? `<button class="back" data-a="go" data-s="${back}" aria-label="Retour">‹ Retour</button>` : '<span></span>'}
@@ -180,9 +271,13 @@ function home() {
   const semaine = reste.length
     ? `<div class="box warn"><b>${reste.length === 3 ? 'Les 3 contrôles' : plural(reste.length, 'contrôle')} de la semaine à faire</b><br>${reste.map(t => RONDES[t].nom).join(', ')}</div>`
     : `<div class="box" style="border-color:var(--safe);background:var(--safe-bg)"><b>Contrôles de la semaine terminés.</b><br>Prochain rappel lundi à ${RAPPEL.heure} h ${p2(RAPPEL.minute)}.</div>`;
-  return `<div class="hero"><img class="mark" src="icon.svg" alt="IGH"><div><h1>${esc(BATIMENT)}</h1><p>Ronde de sécurité hebdomadaire</p></div></div>
+  return `<div class="hero"><img class="mark" src="icon.svg" alt="IGH"><div class="grow"><h1>${esc(BATIMENT)}</h1><p>Ronde de sécurité hebdomadaire</p></div>
+    <button class="gear" data-a="go" data-s="param" aria-label="Paramètres">⚙</button></div>
+  ${MAJ && MAJ.dispo ? `<button class="box majbox" data-a="go" data-s="param"><b>Mise à jour disponible : ${esc(MAJ.derniere.tag)}</b><br>Appuyez ici pour l’installer.</button>` : ''}
   ${semaine}
-  <div class="agent"><label for="ag">Contrôleur</label><input id="ag" value="${esc(DB.agent)}" placeholder="Nom Prénom" autocomplete="name"></div>
+  ${DB.agent
+    ? `<div class="mut small agentline">Agent : <b>${esc(DB.agent)}</b> · <button class="lk" data-a="go" data-s="param">modifier</button></div>`
+    : `<button class="box ko" data-a="go" data-s="param" style="width:100%;text-align:left"><b>Renseignez votre nom</b><br>Il est demandé avant la première ronde : Paramètres.</button>`}
   <h2>Choisissez la ronde à faire</h2>
   ${cartes}
   <div class="tiles">
@@ -259,17 +354,26 @@ function recap() {
 
 /* ---------- Écran : rapport d'une ronde clôturée ---------- */
 function anoCard(a, showRonde) {
-  const { r, s, p, x } = a, st = x.suivi || 'À traiter';
+  const { r, s, p, x } = a, st = x.suivi || 'À traiter', id = `data-r="${r.id}" data-k="${p.k}"`;
   const where = [showRonde ? RONDES[r.type].nom : '', s.titre, x.lieu && x.lieu !== s.titre ? x.lieu : ''].filter(Boolean).join(', ');
   const last = (x.hist || []).slice(-1)[0];
-  return `<div class="ano ${st === 'Levée' ? 'levee' : st === 'En cours' ? 'encours' : ''}">
-    ${x.ph ? `<button class="tb" data-a="photo" data-r="${r.id}" data-k="${p.k}" aria-label="Agrandir la photo"><img class="thumb" src="${x.ph}" alt=""></button>` : ''}
+  const coms = (x.coms || []).map(c => `<li><span class="mut small">${fd(c.t)} ${ft(c.t)} · ${esc(c.auteur)}</span><br>${esc(c.txt)}</li>`).join('');
+  return `<div class="ano ${x.archive ? 'arch' : st === 'Levée' ? 'levee' : st === 'En cours' ? 'encours' : ''}">
+    ${x.ph ? `<button class="tb" data-a="photo" ${id} aria-label="Agrandir la photo"><img class="thumb" src="${x.ph}" alt=""></button>` : ''}
     <div class="w">${p.id} ${esc(p.lib)}</div>
     <div class="mut small">${esc(where)}<br>Constatée le ${fd(x.t)} à ${ft(x.t)}</div>
     <div class="obs">${esc(x.com)}</div>
-    <div class="seg">${['À traiter', 'En cours', 'Levée'].map(v =>
-      `<button class="${v === st ? 'on' : ''}" data-v="${v}" data-a="suivi" data-r="${r.id}" data-k="${p.k}">${v}</button>`).join('')}</div>
-    ${last ? `<div class="tm">${esc(last.s)} depuis le ${fd(last.t)} à ${ft(last.t)}</div>` : ''}
+    ${x.archive
+      ? `<div class="pill">Archivée le ${fd(x.archive.t)}</div> <button class="lk" data-a="desarchiver" ${id}>Désarchiver</button>`
+      : `<div class="seg">${['À traiter', 'En cours', 'Levée'].map(v =>
+          `<button class="${v === st ? 'on' : ''}" data-v="${v}" data-a="suivi" ${id}>${v}</button>`).join('')}</div>
+         ${last ? `<div class="tm">${esc(last.s)} depuis le ${fd(last.t)} à ${ft(last.t)}</div>` : ''}`}
+    <div class="coms"><div class="mut small"><b>Commentaires de suivi</b>${(x.coms || []).length ? ' (' + x.coms.length + ')' : ''}</div>
+      ${coms ? `<ul>${coms}</ul>` : ''}
+      <div class="addc"><textarea rows="2" data-cin="${r.id}|${p.k}" placeholder="Ajouter un commentaire (ex. : devis demandé, intervention prévue le 12/10…)"></textarea>
+      <button class="btn ghost" data-a="addCom" ${id}>Ajouter le commentaire</button></div>
+    </div>
+    ${!x.archive && st === 'Levée' ? `<button class="btn ghost" data-a="archiver" ${id}>Archiver cette anomalie levée</button>` : ''}
   </div>`;
 }
 function rapport() {
@@ -280,7 +384,8 @@ function rapport() {
   ${r.incomplete ? `<div class="box ko"><b>Ronde incomplète :</b> ${plural(s.rest, 'point', 'points')} sans réponse.<br>Motif : ${esc(r.motif)}</div>` : ''}
   <div class="kpi"><div class="ok"><b>${s.c}</b><span>conformes</span></div><div class="ko"><b>${s.n}</b><span>non conformes</span></div><div class="${s.rest ? 'wa' : ''}"><b>${s.rest}</b><span>sans réponse</span></div></div>
   <button class="btn" data-a="pdf" data-r="${r.id}">Exporter le rapport PDF</button>
-  <button class="btn ghost" data-a="csv" data-r="${r.id}">Exporter le détail en CSV (Excel)</button>
+  <button class="btn ghost" data-a="csv" data-r="${r.id}">Exporter le détail en CSV (Excel) et les photos</button>
+  ${r.signature ? `<div class="box sigbox"><div class="mut small">Signé par <b>${esc(r.signature.nom)}</b> le ${fd(r.signature.t)} à ${ft(r.signature.t)}</div><img src="${r.signature.img}" alt="Signature"></div>` : ''}
   <h2>${nc.length ? plural(nc.length, 'anomalie') : 'Aucune anomalie constatée'}</h2>
   ${nc.map(a => anoCard(a, false)).join('')}`;
 }
@@ -304,19 +409,58 @@ function hist() {
 /* ---------- Écran : suivi des anomalies ---------- */
 function anom() {
   const all = anomalies().reverse();
-  const l = all.filter(a => (F.anomRonde === 'all' || a.r.type === F.anomRonde)
-    && (F.anomStatut === 'all' || (F.anomStatut === 'open' ? ouverte(a) : !ouverte(a))));
+  const statut = { open: a => ouverte(a) && !archivee(a), done: a => !ouverte(a) && !archivee(a), arch: archivee, all: () => true };
+  const l = all.filter(a => (F.anomRonde === 'all' || a.r.type === F.anomRonde) && statut[F.anomStatut](a));
   const chip = (k, v, n) => `<button class="chip ${F[k] === v ? 'on' : ''}" data-a="fAnom" data-f="${k}" data-v="${v}">${n}</button>`;
   return `${topBar('home', 'Anomalies', plural(all.filter(ouverte).length, 'ouverte', 'ouvertes'))}
-  <div class="chips">${chip('anomStatut', 'open', 'Ouvertes')}${chip('anomStatut', 'done', 'Levées')}${chip('anomStatut', 'all', 'Toutes')}</div>
+  <div class="chips">${chip('anomStatut', 'open', 'Ouvertes')}${chip('anomStatut', 'done', 'Levées')}${chip('anomStatut', 'arch', 'Archivées')}${chip('anomStatut', 'all', 'Toutes')}</div>
   <div class="chips">${chip('anomRonde', 'all', 'Toutes les rondes')}${Object.keys(RONDES).map(t => chip('anomRonde', t, RONDES[t].nom)).join('')}</div>
   ${l.length ? l.map(a => anoCard(a, true)).join('')
     : `<div class="empty">${F.anomStatut === 'open' ? 'Aucune anomalie ouverte.' : 'Aucune anomalie dans cette sélection.'}</div>`}`;
 }
 
+/* ---------- Écran : paramètres ---------- */
+function param() {
+  const taille = Math.round((localStorage.getItem(KEY) || '').length / 1024);
+  const m = MAJ;
+  return `${topBar('home', 'Paramètres', '')}
+  <h2>Agent</h2>
+  <div class="agent"><label for="ag">Nom</label><input id="ag" value="${esc(DB.agent)}" placeholder="Prénom Nom" autocomplete="name"></div>
+  <p class="mut small">Ce nom est enregistré sur chaque ronde, dans les rapports et avec la signature.</p>
+
+  <h2>Sauvegarde des données</h2>
+  <div class="box">
+    <p>Toutes les rondes, anomalies, photos et signatures dans un seul fichier, à conserver hors du téléphone
+    (messagerie, OneDrive…). Il permet de tout retrouver après un changement de téléphone ou une réinstallation.</p>
+    <button class="btn" data-a="backup">Créer une sauvegarde</button>
+    <label class="btn ghost">Restaurer une sauvegarde…<input id="imp" type="file" accept="application/json,.json" hidden></label>
+    <p class="mut small">Données actuelles : ${plural(DB.rondes.length, 'ronde')}, environ ${taille} Ko.</p>
+  </div>
+
+  <h2>Mise à jour de l’application</h2>
+  <div class="box">
+    <p id="ver">Version installée : ${m ? esc(m.installe.version) : '…'}</p>
+    ${m ? (m.dispo
+      ? `<p><b>Nouvelle version disponible : ${esc(m.derniere.tag)}</b> (publiée le ${fd(m.derniere.date)})</p>
+         <button class="btn go" data-a="majInstall">Installer la mise à jour</button>
+         <p class="mut small">Une sauvegarde est créée automatiquement avant l’installation. Android demande ensuite de confirmer.</p>`
+      : `<p class="mut">L’application est à jour (dernière version publiée : ${esc(m.derniere.tag || '—')}).</p>`) : ''}
+    <button class="btn ghost" data-a="majCheck">Rechercher une mise à jour</button>
+  </div>`;
+}
+
 /* ---------- Fenêtres ---------- */
 function sheet() {
   if (M.kind === 'photo') return `<div class="modal photo" data-a="cancel"><img src="${M.src}" alt="Photo de l’anomalie"></div>`;
+  if (M.kind === 'sign') {
+    const r = cur();
+    return `<div class="modal"><div class="sheet"><h1>Signature</h1>
+      <p>${esc(r.agent)} — ronde « ${RONDES[r.type].nom} » du ${fd(r.debut)}${M.motif ? ' <b>(incomplète)</b>' : ''}.<br>
+      En signant, vous certifiez avoir réalisé cette ronde. Elle sera clôturée et ne sera plus modifiable.</p>
+      <canvas id="sig" class="sig" aria-label="Zone de signature"></canvas>
+      <button class="lk" data-a="signClear">Effacer la signature</button>
+      <button class="btn go" data-a="signOk">Signer et clôturer</button><button class="btn ghost" data-a="cancel">Annuler</button></div></div>`;
+  }
   if (M.kind === 'close') {
     const c = cnt(cur());
     return `<div class="modal"><div class="sheet"><h1>Clôturer la ronde incomplète</h1>
@@ -335,9 +479,10 @@ function sheet() {
 }
 
 /* ---------- Rendu ---------- */
-const SCREENS = { home, list, st: stationView, recap, rep: rapport, hist, anom };
+const SCREENS = { home, list, st: stationView, recap, rep: rapport, hist, anom, param };
 function render(keepScroll) {
   $('#app').innerHTML = SCREENS[V.s]() + (M ? sheet() : '');
+  if (M && M.kind === 'sign') initSignature();
   if (!keepScroll) scrollTo(0, 0);
   rememberScreen();
   showSaved();
@@ -383,8 +528,23 @@ function setSuivi(r, k, v) {
   x.hist = (x.hist || []).concat({ s: v, t: now() });   // trace de chaque changement de statut
   save();
 }
-function cloturer(r, motif) {
+/* Zone de signature au doigt (canvas). Fond blanc pour un rendu identique à l'écran et dans le PDF. */
+function initSignature() {
+  const c = $('#sig'), ratio = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * ratio; c.height = c.clientHeight * ratio;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.lineWidth = 2.6 * ratio; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#14212b';
+  SIG.traits = 0;
+  let enCours = false;
+  const pos = e => { const b = c.getBoundingClientRect(); return [(e.clientX - b.left) * ratio, (e.clientY - b.top) * ratio]; };
+  c.onpointerdown = e => { enCours = true; c.setPointerCapture(e.pointerId); g.beginPath(); g.moveTo(...pos(e)); g.lineTo(...pos(e)); g.stroke(); SIG.traits++; };
+  c.onpointermove = e => { if (!enCours) return; g.lineTo(...pos(e)); g.stroke(); };
+  c.onpointerup = c.onpointercancel = () => { enCours = false; };
+}
+function cloturer(r, motif, signature) {
   r.statut = 'clôturée';
+  if (signature) r.signature = signature;
   r.fin = now();
   r.sum = cnt(r);
   if (motif) { r.incomplete = true; r.motif = motif; }
@@ -404,10 +564,9 @@ document.addEventListener('click', e => {
   switch (a) {
     case 'go': V = { s: b.dataset.s }; render(); break;
     case 'new': {
-      const n = $('#ag').value.trim(), t = b.dataset.t;
-      if (!n) { $('#ag').focus(); $('#ag').parentNode.classList.add('err'); return; }
+      const n = (DB.agent || '').trim(), t = b.dataset.t;
+      if (!n) { alert('Renseignez d’abord votre nom dans les Paramètres.'); V = { s: 'param' }; render(); return; }
       if (!confirm('Démarrer la ronde « ' + RONDES[t].nom + ' » ?')) return;
-      DB.agent = n;
       const id = Date.now();
       DB.rondes.push({ id, type: t, debut: now(), agent: n, statut: 'en cours', r: {} });
       DB.cur = id; save(); V = { s: 'list' }; render();
@@ -440,14 +599,18 @@ document.addEventListener('click', e => {
       const k = M.k; M = null; render(true); scrollToNext(k);
       break;
     }
-    case 'fin':
-      if (confirm('Clôturer la ronde « ' + RONDES[r.type].nom + ' » ? Elle ne sera plus modifiable.')) cloturer(r);
+    case 'fin': M = { kind: 'sign' }; render(true); break;
+    case 'signClear': initSignature(); break;
+    case 'signOk': {
+      if (!SIG.traits) { alert('Signez dans le cadre avant de clôturer.'); return; }
+      cloturer(r, M.motif, { img: $('#sig').toDataURL('image/png'), nom: r.agent, t: now() });
       break;
+    }
     case 'closeForm': M = { kind: 'close' }; render(true); break;
     case 'finForce': {
       const m = $('#motif').value.trim();
       if (!m) { $('#motif').focus(); $('#motif').classList.add('err'); return; }
-      cloturer(r, m);
+      M = { kind: 'sign', motif: m }; render(true);
       break;
     }
     case 'drop':
@@ -462,13 +625,41 @@ document.addEventListener('click', e => {
     case 'photo': M = { kind: 'photo', src: byId(b.dataset.r).r[b.dataset.k].ph }; render(true); break;
     case 'fHist': F.hist = b.dataset.v; render(true); break;
     case 'fAnom': F[b.dataset.f] = b.dataset.v; render(true); break;
+    case 'addCom': {
+      const ta = document.querySelector(`[data-cin="${b.dataset.r}|${b.dataset.k}"]`), txt = ta.value.trim();
+      if (!txt) { ta.focus(); ta.classList.add('err'); return; }
+      const x = byId(b.dataset.r).r[b.dataset.k];
+      x.coms = (x.coms || []).concat({ t: now(), auteur: DB.agent || 'Agent', txt });
+      save(); render(true);
+      break;
+    }
+    case 'archiver': {
+      const x = byId(b.dataset.r).r[b.dataset.k];
+      if (!confirm('Archiver cette anomalie levée ? Elle n’apparaîtra plus que dans le filtre « Archivées ».')) return;
+      x.archive = { t: now() }; x.hist = (x.hist || []).concat({ s: 'Archivée', t: x.archive.t });
+      save(); render(true);
+      break;
+    }
+    case 'desarchiver': {
+      const x = byId(b.dataset.r).r[b.dataset.k];
+      delete x.archive; x.hist = (x.hist || []).concat({ s: 'Désarchivée', t: now() });
+      save(); render(true);
+      break;
+    }
+    case 'backup': exporterSauvegarde(); break;
+    case 'majCheck':
+      b.disabled = true; b.textContent = 'Recherche en cours…';
+      chercherMaj().then(() => render(true)).catch(e => { alert('Recherche impossible : ' + e.message + '\nVérifiez la connexion internet.'); render(true); });
+      break;
+    case 'majInstall': installerMaj(); break;
   }
 });
 
 /* Nom du contrôleur mémorisé dès la saisie */
 document.addEventListener('input', e => {
   const id = e.target.id;
-  if (id === 'ag') { DB.agent = e.target.value.trim(); save(); e.target.parentNode.classList.remove('err'); }
+  if (id === 'ag') { DB.agent = e.target.value.trim(); save(); }
+  if (e.target.dataset && e.target.dataset.cin) e.target.classList.remove('err');
   if (M && M.kind === 'nc' && (id === 'lieu' || id === 'com' || id === 'ent')) { M.x[id] = e.target.value; rememberScreen(); }
 });
 
@@ -476,6 +667,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'ent' && M && M.kind === 'nc') { M.x.ent = t.value; rememberScreen(); }
+  if (t.id === 'imp' && t.files[0]) { const fr = new FileReader(); fr.onload = () => restaurer(fr.result); fr.readAsText(t.files[0]); t.value = ''; return; }
   if (t.id !== 'ph' || !t.files[0]) return;
   M.x.lieu = $('#lieu').value; M.x.ent = $('#ent').value; M.x.com = $('#com').value;
   rememberScreen();
@@ -495,7 +687,7 @@ document.addEventListener('change', e => {
 });
 
 /* Bouton retour Android (APK) : écran précédent ; false sur l'accueil = quitter l'appli. */
-const PREV = { st: 'list', list: 'home', recap: 'list', rep: 'hist', hist: 'home', anom: 'home' };
+const PREV = { st: 'list', list: 'home', recap: 'list', rep: 'hist', hist: 'home', anom: 'home', param: 'home' };
 window.onBack = () => {
   if (M) { M = null; render(true); return true; }
   const p = PREV[V.s];
@@ -508,3 +700,4 @@ restoreScreen();
 render(true);
 majRappels();
 scrollTo(0, startY);
+majAuDemarrage();

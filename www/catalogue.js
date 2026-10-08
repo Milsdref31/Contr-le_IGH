@@ -56,6 +56,9 @@ const POINTS = [
   ['13.2', 'Centrale de désenfumage', 'Absence de défaut / voyant orange ou rouge', 'o'],
 ];
 
+/* Mise à jour depuis l'application : dépôt GitHub dont les « Releases » publient l'APK. */
+const MISE_A_JOUR = { depot: 'Milsdref31/Contr-le_IGH' };
+
 /* Rappel : du lundi au vendredi à cette heure, tant que les 3 rondes de la semaine ne sont pas clôturées (APK). */
 const RAPPEL = { heure: 8, minute: 30, jours: [1, 2, 3, 4, 5] };   // 1 = lundi … 5 = vendredi
 
