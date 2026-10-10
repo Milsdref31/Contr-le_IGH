@@ -28,6 +28,16 @@ function showSaved() {
   if (el && lastSave) el.textContent = 'Enregistré ' + lastSave.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+/* Capacité du stockage de la WebView : ≈ 4,9 millions de caractères mesurés (Chromium 141).
+   On calcule l'occupation sur 4,8 millions par prudence ; alerte à 60 %. */
+const CAPACITE = 4800000, SEUIL_ALERTE = 0.6;
+function occupation() {
+  let n = 0;
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; }
+  return n / CAPACITE;
+}
+/* Ancienne copie interne gardée par la restauration (versions ≤ 1.0.12) : elle occupait la moitié de la place. */
+try { localStorage.removeItem(KEY + '_avant_restauration'); } catch (e) { /* rien */ }
 const cur = () => DB.rondes.find(r => r.id === DB.cur);
 const byId = id => DB.rondes.find(r => r.id == id);
 const enCours = t => DB.rondes.find(r => r.type === t && r.statut === 'en cours');
@@ -36,7 +46,10 @@ const now = () => new Date().toISOString();
 
 /* ---------- Outils d'affichage ---------- */
 const $ = s => document.querySelector(s);
-const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* Une image n'est affichée que si c'est vraiment une image JPEG ou PNG encodée (photo, signature).
+   Protège contre un fichier de sauvegarde modifié qui tenterait d'injecter du code. */
+const imageOk = s => typeof s === 'string' && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(s);
 const p2 = n => String(n).padStart(2, '0');
 const fd = i => new Date(i).toLocaleDateString('fr-FR');
 const ft = i => new Date(i).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -176,21 +189,47 @@ async function exporterSauvegarde(partager = true) {
   if (NATIVE) return Native ? Native.saveAndShareMany([{ nom, blob: b }], 'Sauvegardes', nom, partager) : natifIndispo();
   telecharger(URL.createObjectURL(b), nom);
 }
-function restaurer(texte) {
+/* Vérifie la structure d'une sauvegarde et retire toute image qui n'est pas une vraie image.
+   Renvoie null si le contenu n'a pas la forme attendue. */
+function nettoyerSauvegarde(d) {
+  let retirees = 0;
+  const objet = v => v && typeof v === 'object' && !Array.isArray(v);
+  if (!objet(d) || !Array.isArray(d.rondes)) return null;
+  for (const r of d.rondes) {
+    if (!objet(r) || !Number.isFinite(r.id) || !RONDES[r.type] || !objet(r.r) || typeof r.debut !== 'string'
+      || typeof r.agent !== 'string' || (r.statut !== 'en cours' && r.statut !== 'clôturée')) return null;
+    for (const k of Object.keys(r.r)) {
+      const x = r.r[k];
+      if (!objet(x) || (x.v !== 'C' && x.v !== 'NC')) return null;
+      if (x.ph !== undefined && !imageOk(x.ph)) { delete x.ph; retirees++; }
+    }
+    if (r.signature !== undefined) {
+      if (!objet(r.signature)) return null;
+      if (!imageOk(r.signature.img)) { delete r.signature.img; retirees++; }
+    }
+  }
+  d.rondes.forEach(r => { if (r.statut === 'clôturée') r.sum = cnt(r); });   // totaux recalculés, jamais lus dans le fichier
+  return { data: { rondes: d.rondes, cur: null, agent: typeof d.agent === 'string' ? d.agent : '' }, retirees };
+}
+async function restaurer(texte) {
   let o;
   try { o = JSON.parse(texte); } catch (e) { alert('Fichier illisible : ce n’est pas une sauvegarde de l’application.'); return; }
   if (!o || o.app !== 'controle-igh' || !o.data || !Array.isArray(o.data.rondes)) {
     alert('Ce fichier n’est pas une sauvegarde de l’application Contrôle IGH.'); return;
   }
-  const n = o.data.rondes.length;
+  const propre = nettoyerSauvegarde(o.data);
+  if (!propre) { alert('Ce fichier de sauvegarde est incomplet ou modifié : il ne peut pas être restauré.'); return; }
+  const n = propre.data.rondes.length;
   if (!confirm('Restaurer la sauvegarde du ' + fd(o.creee) + ' à ' + ft(o.creee) + ' (' + plural(n, 'ronde') + ') ?\n\n'
-    + 'Les données actuelles de l’application seront REMPLACÉES.')) return;
-  try { localStorage.setItem(KEY + '_avant_restauration', JSON.stringify(DB)); } catch (e) { /* place insuffisante : on continue */ }
-  DB = o.data;
+    + 'Les données actuelles de l’application seront REMPLACÉES.'
+    + (NATIVE ? '\nUne sauvegarde de sécurité des données actuelles est d’abord enregistrée dans Documents/Contrôle IGH/Sauvegardes.' : ''))) return;
+  if (NATIVE && Native) await exporterSauvegarde(false);
+  DB = propre.data;
   DB.ui = null;
   save();
   V = { s: 'home' }; M = null; render(); majRappels();
-  alert('Sauvegarde restaurée : ' + plural(n, 'ronde') + '.');
+  alert('Sauvegarde restaurée : ' + plural(n, 'ronde') + '.'
+    + (propre.retirees ? '\n' + plural(propre.retirees, 'image non valide a été retirée', 'images non valides ont été retirées') + '.' : ''));
 }
 
 /* ---------- Mise à jour depuis l'application (APK) ---------- */
@@ -224,7 +263,7 @@ async function installerMaj() {
 }
 /* Recherche discrète au démarrage (une fois par jour, sans message en cas d'échec). */
 function majAuDemarrage() {
-  if (!(NATIVE && Native)) return;
+  if (!(NATIVE && Native) || MISE_A_JOUR.verificationAuto === false) return;
   const auj = jour(now());
   if (DB.majVerif === auj) return;
   chercherMaj().then(() => {
@@ -275,6 +314,7 @@ function home() {
     <button class="gear" data-a="go" data-s="param" aria-label="Paramètres">⚙</button></div>
   ${MAJ && MAJ.dispo ? `<button class="box majbox" data-a="go" data-s="param"><b>Mise à jour disponible : ${esc(MAJ.derniere.tag)}</b><br>Appuyez ici pour l’installer.</button>` : ''}
   ${semaine}
+  ${occupation() >= SEUIL_ALERTE ? `<button class="box ko" data-a="go" data-s="param" style="width:100%;text-align:left"><b>Mémoire de l’application occupée à ${Math.round(occupation() * 100)} %</b><br>Créez une sauvegarde dans les Paramètres et conservez-la hors du téléphone.</button>` : ''}
   ${DB.agent
     ? `<div class="mut small agentline">Agent : <b>${esc(DB.agent)}</b> · <button class="lk" data-a="go" data-s="param">modifier</button></div>`
     : `<button class="box ko" data-a="go" data-s="param" style="width:100%;text-align:left"><b>Renseignez votre nom</b><br>Il est demandé avant la première ronde : Paramètres.</button>`}
@@ -359,7 +399,7 @@ function anoCard(a, showRonde) {
   const last = (x.hist || []).slice(-1)[0];
   const coms = (x.coms || []).map(c => `<li><span class="mut small">${fd(c.t)} ${ft(c.t)} · ${esc(c.auteur)}</span><br>${esc(c.txt)}</li>`).join('');
   return `<div class="ano ${x.archive ? 'arch' : st === 'Levée' ? 'levee' : st === 'En cours' ? 'encours' : ''}">
-    ${x.ph ? `<button class="tb" data-a="photo" ${id} aria-label="Agrandir la photo"><img class="thumb" src="${x.ph}" alt=""></button>` : ''}
+    ${imageOk(x.ph) ? `<button class="tb" data-a="photo" ${id} aria-label="Agrandir la photo"><img class="thumb" src="${x.ph}" alt=""></button>` : ''}
     <div class="w">${p.id} ${esc(p.lib)}</div>
     <div class="mut small">${esc(where)}<br>Constatée le ${fd(x.t)} à ${ft(x.t)}</div>
     <div class="obs">${esc(x.com)}</div>
@@ -385,7 +425,7 @@ function rapport() {
   <div class="kpi"><div class="ok"><b>${s.c}</b><span>conformes</span></div><div class="ko"><b>${s.n}</b><span>non conformes</span></div><div class="${s.rest ? 'wa' : ''}"><b>${s.rest}</b><span>sans réponse</span></div></div>
   <button class="btn" data-a="pdf" data-r="${r.id}">Exporter le rapport PDF</button>
   <button class="btn ghost" data-a="csv" data-r="${r.id}">Exporter le détail en CSV (Excel) et les photos</button>
-  ${r.signature ? `<div class="box sigbox"><div class="mut small">Signé par <b>${esc(r.signature.nom)}</b> le ${fd(r.signature.t)} à ${ft(r.signature.t)}</div><img src="${r.signature.img}" alt="Signature"></div>` : ''}
+  ${r.signature && imageOk(r.signature.img) ? `<div class="box sigbox"><div class="mut small">Signé par <b>${esc(r.signature.nom)}</b> le ${fd(r.signature.t)} à ${ft(r.signature.t)}</div><img src="${r.signature.img}" alt="Signature"></div>` : ''}
   <h2>${nc.length ? plural(nc.length, 'anomalie') : 'Aucune anomalie constatée'}</h2>
   ${nc.map(a => anoCard(a, false)).join('')}`;
 }
@@ -421,7 +461,7 @@ function anom() {
 
 /* ---------- Écran : paramètres ---------- */
 function param() {
-  const taille = Math.round((localStorage.getItem(KEY) || '').length / 1024);
+  const occ = occupation(), pct = Math.min(100, Math.round(occ * 100));
   const m = MAJ;
   return `${topBar('home', 'Paramètres', '')}
   <h2>Agent</h2>
@@ -434,7 +474,9 @@ function param() {
     (messagerie, OneDrive…). Il permet de tout retrouver après un changement de téléphone ou une réinstallation.</p>
     <button class="btn" data-a="backup">Créer une sauvegarde</button>
     <label class="btn ghost">Restaurer une sauvegarde…<input id="imp" type="file" accept="application/json,.json" hidden></label>
-    <p class="mut small">Données actuelles : ${plural(DB.rondes.length, 'ronde')}, environ ${taille} Ko.</p>
+    <p class="mut small">Données actuelles : ${plural(DB.rondes.length, 'ronde')}.</p>
+    <div class="jauge ${occ >= SEUIL_ALERTE ? 'ko' : ''}" role="meter" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <p class="mut small">Mémoire de l’application occupée à ${pct} %. Au-delà de ${Math.round(SEUIL_ALERTE * 100)} %, une alerte s’affiche sur l’accueil.</p>
   </div>
 
   <h2>Mise à jour de l’application</h2>
@@ -451,7 +493,7 @@ function param() {
 
 /* ---------- Fenêtres ---------- */
 function sheet() {
-  if (M.kind === 'photo') return `<div class="modal photo" data-a="cancel"><img src="${M.src}" alt="Photo de l’anomalie"></div>`;
+  if (M.kind === 'photo') return imageOk(M.src) ? `<div class="modal photo" data-a="cancel"><img src="${M.src}" alt="Photo de l’anomalie"></div>` : '';
   if (M.kind === 'sign') {
     const r = cur();
     return `<div class="modal"><div class="sheet"><h1>Signature</h1>
@@ -474,7 +516,7 @@ function sheet() {
     <label for="ent">Entrée</label><select id="ent">${['', 'n°1', 'n°3'].map(o => `<option ${o === x.ent ? 'selected' : ''}>${o}</option>`).join('')}</select>
     <label for="com">Observation (obligatoire)</label><textarea id="com" rows="3">${esc(x.com)}</textarea>
     <label class="btn ghost" data-a="snap">📷 Prendre ou joindre une photo<input id="ph" type="file" accept="image/*" capture="environment" hidden></label>
-    <div id="pv">${x.ph ? `<img src="${x.ph}" alt="">` : ''}</div>
+    <div id="pv">${imageOk(x.ph) ? `<img src="${x.ph}" alt="">` : ''}</div>
     <button class="btn" data-a="save">Enregistrer l’anomalie</button><button class="btn ghost" data-a="cancel">Annuler</button></div></div>`;
 }
 
@@ -542,6 +584,16 @@ function initSignature() {
   c.onpointermove = e => { if (!enCours) return; g.lineTo(...pos(e)); g.stroke(); };
   c.onpointerup = c.onpointercancel = () => { enCours = false; };
 }
+/* Image de signature réduite à 480 px de large (PNG ou JPEG, le plus léger des deux) :
+   l'écran d'un téléphone est 2 à 3 fois plus dense que nécessaire pour un rapport. */
+function signatureCompacte(c) {
+  const l = Math.min(480, c.width), h = Math.round(c.height * l / c.width), t = document.createElement('canvas');
+  t.width = l; t.height = h;
+  const g = t.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, l, h); g.drawImage(c, 0, 0, l, h);
+  const png = t.toDataURL('image/png'), jpg = t.toDataURL('image/jpeg', 0.8);
+  return png.length <= jpg.length ? png : jpg;
+}
 function cloturer(r, motif, signature) {
   r.statut = 'clôturée';
   if (signature) r.signature = signature;
@@ -603,7 +655,7 @@ document.addEventListener('click', e => {
     case 'signClear': initSignature(); break;
     case 'signOk': {
       if (!SIG.traits) { alert('Signez dans le cadre avant de clôturer.'); return; }
-      cloturer(r, M.motif, { img: $('#sig').toDataURL('image/png'), nom: r.agent, t: now() });
+      cloturer(r, M.motif, { img: signatureCompacte($('#sig')), nom: r.agent, t: now() });
       break;
     }
     case 'closeForm': M = { kind: 'close' }; render(true); break;

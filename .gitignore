@@ -2,3 +2,4 @@ node_modules/
 *.keystore
 *.jks
 android/keystore.properties
+tests/.cache/

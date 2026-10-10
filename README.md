@@ -99,7 +99,10 @@ Une ronde interrompue reste « En cours » sur l'accueil : il suffit d'appuyer d
   (rondes, anomalies, photos, signatures), enregistré dans `Documents/Contrôle IGH/Sauvegardes/` et proposé au partage.
   À conserver hors du téléphone (messagerie, OneDrive…).
 - **Restaurer une sauvegarde** : choisir le fichier ; après confirmation, il **remplace** les données de l'application
-  (changement de téléphone, réinstallation).
+  (changement de téléphone, réinstallation). Une sauvegarde de sécurité des données actuelles est d'abord enregistrée ;
+  un fichier incomplet ou modifié est refusé.
+- **Mémoire de l'application** : une jauge indique l'occupation du stockage ; au-delà de 60 %, une alerte s'affiche
+  sur l'accueil pour inviter à créer une sauvegarde.
 - **Mise à jour** : « Rechercher une mise à jour » compare la version installée à la dernière version publiée ;
   « Installer la mise à jour » crée d'abord une sauvegarde, télécharge la nouvelle version puis ouvre l'installateur
   Android (confirmation demandée). La première fois, Android demande d'autoriser l'application à installer des mises à jour.
@@ -184,6 +187,8 @@ www/                        application (seul dossier à modifier pour le foncti
   icon.svg, logo.png        logo (en-tête de l'accueil, en-tête du PDF)
 android/                    projet Android (manifeste, icônes, signature) — généré par Capacitor
   app/src/main/java/…/UpdaterPlugin.java   plugin de mise à jour depuis l'application
+tests/test_application.py   tests automatisés de bout en bout (navigateur + Android simulé) — voir tests/README.md
+tests/harnais_android.py    faux téléphone : vrai pont Capacitor + réponses natives simulées
 tools/make_logo.py          dessine le logo et régénère toutes les icônes
 tools/BarlowCondensed-Bold.ttf, tools/OFL-Barlow.txt   police utilisée par make_logo.py
 .github/workflows/apk.yml   compilation automatique de l'APK
@@ -212,6 +217,7 @@ package.json                dépendances (versions figées)
 | Réseau | Uniquement pour la mise à jour (`api.github.com` et téléchargement de l'APK). Aucune donnée de ronde n'est transmise. |
 | Permissions Android | `POST_NOTIFICATIONS` (rappels) · `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` (rappels conservés après redémarrage) · `INTERNET` (mise à jour) · `REQUEST_INSTALL_PACKAGES` (installation de la mise à jour, confirmée par l'utilisateur) · `READ/WRITE_EXTERNAL_STORAGE` limitées à Android ≤ 10 (écriture dans `Documents`). |
 | Sauvegarde | Fichier de sauvegarde créé à la demande par l'agent (Paramètres). Il contient toutes les données, photos et signatures comprises : à stocker sur un espace professionnel. Aucune sauvegarde centrale automatique ; les PDF exportés constituent la trace officielle. |
+| Protection du code de la page | Textes saisis échappés avant affichage ; images (photos, signature) acceptées seulement si ce sont de vraies images JPEG/PNG ; sauvegarde contrôlée avant restauration ; politique de sécurité du contenu (CSP) limitant les connexions à `api.github.com`. |
 | Signature électronique | Image du tracé manuscrit, associée au nom de l'agent et à l'horodatage. Il s'agit d'une signature simple (pas de certificat qualifié au sens eIDAS). |
 | Code source | Dépôt public : il ne contient aucune donnée de ronde, aucun mot de passe ni aucune clé. |
 
@@ -262,6 +268,7 @@ signée avec **la même clé**. La clé est fournie au workflow par quatre secre
 | Changer l'ordre ou la liste des niveaux | `www/catalogue.js`, `NIVEAUX` |
 | Changer le niveau de la centrale SSI | `www/catalogue.js`, `NIVEAU_SSI = { 1: 'RDC', 3: 'R+1' }` |
 | Changer le dépôt utilisé pour les mises à jour | `www/catalogue.js`, `MISE_A_JOUR = { depot: 'propriétaire/dépôt' }` |
+| Désactiver la recherche automatique de mise à jour au démarrage | `www/catalogue.js`, `MISE_A_JOUR.verificationAuto = false` |
 | Changer l'heure ou les jours des rappels | `www/catalogue.js`, `RAPPEL = { heure: 8, minute: 30, jours: [1, 2, 3, 4, 5] }` |
 | Modifier le rapport PDF | `www/pdf.js` |
 | Modifier le logo ou les icônes | `tools/make_logo.py`, puis `python3 tools/make_logo.py` (Pillow et fontTools requis) |
@@ -279,6 +286,13 @@ Pour contrôler une modification sans compiler l'APK, servir le dossier `www/` e
 Toutes les fonctions sont utilisables, sauf celles propres à Android : enregistrement dans `Documents`,
 menu de partage (remplacé par des téléchargements), bouton retour, notifications et installation de mise à jour.
 
+### Tests automatisés
+
+`python3 tests/test_application.py` joue 39 contrôles de bout en bout, dans un navigateur et avec le vrai pont
+Capacitor relié à un faux téléphone : parcours, enregistrement automatique, signature, suivi des anomalies, exports,
+sauvegarde et restauration (dont un fichier piégé), alerte de stockage, mise à jour, rappels. Détails et prérequis :
+[`tests/README.md`](tests/README.md). Non couvert : le comportement d'un téléphone physique (recette manuelle).
+
 ### Limites connues
 
 - Pas de partage multi-utilisateurs ni de consultation à distance : chaque téléphone a son propre historique,
@@ -288,5 +302,7 @@ menu de partage (remplacé par des téléchargements), bouton retour, notificati
 - La mise à jour depuis l'application suppose : un dépôt **public** (ou une adaptation pour un dépôt privé),
   et des APK **signés avec la même clé** (voir Signature). Avec les versions `-TEST`, Android refuse l'installation
   par-dessus : il faut alors sauvegarder, désinstaller, installer puis restaurer la sauvegarde.
-- Le stockage interne de la WebView est limité (quelques Mo) : les photos pèsent environ 100 Ko chacune.
-  Créer régulièrement une sauvegarde.
+- **Capacité de stockage** : le `localStorage` de la WebView est limité à environ 4,9 millions de caractères (mesuré,
+  Chromium 141). Une semaine complète (3 rondes signées) occupe environ 100 Ko et une photo environ 58 Ko : la mémoire
+  est pleine en 5 à 10 mois selon le nombre de photos. La jauge et l'alerte à 60 % préviennent l'agent ; la correction
+  durable est le passage du stockage en fichiers ou en IndexedDB (½ à 1 jour de développement).

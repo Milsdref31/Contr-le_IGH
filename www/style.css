@@ -200,3 +200,8 @@ summary{font-weight:600;cursor:pointer}
 .coms li{border-top:1px solid var(--line);padding:6px 0}
 .addc textarea{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;margin-top:6px}
 .addc .btn{padding:10px;margin:6px 0 0}
+
+/* ===== Jauge de stockage ===== */
+.jauge{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin:8px 0 4px}
+.jauge i{display:block;height:100%;background:var(--safe)}
+.jauge.ko i{background:var(--alarm)}

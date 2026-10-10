@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- Politique de sécurité : connexions limitées à l'API GitHub (mise à jour), images locales ou encodées,
+     aucun objet ni formulaire externe. 'unsafe-inline' reste nécessaire pour les styles en ligne et pour
+     l'injection du pont Capacitor sur les WebView anciennes (sans DOCUMENT_START_SCRIPT). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Contrôle IGH</title>
 <link rel="stylesheet" href="style.css">
 </head>
